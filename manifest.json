@@ -1,16 +1,14 @@
 {
-   "background": {
-      "page": "background.html"
+  "name": "Keep One Pinned Tab",
+  "version": "1.0",
+  "description": "A Chrome extension to keep one (unfocused) pinned tab open at all times. Used to prevent Chrome closing with last tab.",
+  "manifest_version": 2,
+  "permissions": [ "tabs" ],
+  "icons": {
+      "48": "icon48.png",
+      "128": "icon128.png"
    },
-   "description": "keeps chrome from closing when the last tab is closed by creating a pinned tab when there is one tab left.",
-   "icons": {
-      "128": "icon128.png",
-      "48": "icon48.png"
-   },
-   "key": "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC165B866GBiU8ZuGlRaHhX01XzCoBl2rmg/bOnGinG4EsRXcGW1xL41FBB+yTAtZem5C+YUh06iliHWT5vN9DfwczKqhBIg7FMc99lbYgmgsxZppaJTGpKvb7voJDtMbmQpovkZXxNT2N0aqWD0oxI41hWWNJ/FSl09salLtWBVwIDAQAB",
-   "manifest_version": 2,
-   "name": "Live On",
-   "permissions": [ "tabs" ],
-   "update_url": "http://clients2.google.com/service/update2/crx",
-   "version": "0.3"
+  "background": {
+	"page": "background.html"
+  }
 }
