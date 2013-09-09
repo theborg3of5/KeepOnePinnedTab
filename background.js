@@ -1,83 +1,47 @@
+﻿var creatingTab = false;
 
+function keepSpecialPinned() {
+	if(!creatingTab) {
+		chrome.windows.getCurrent({populate: true}, function(window){
+			// Make sure we've got our special tab in place.
+			var firstTab = window.tabs[0];
+			if(!firstTab.pinned || firstTab.url !== "chrome://newtab/") {
+				// Make our special tab. Stick it at the beginning, pin it, and don't focus it.
+				creatingTab = true;
+				chrome.tabs.create({"index": 0, "pinned": true, "active": false}, function(tab) {
+					creatingTab = false;
+				});
+			}
+			
+			// Ensure that there's at least one tab after our special one.
+			if(window.tabs.length === 1) {
+				chrome.tabs.create({"active": true});
+			}
+			
+			// Close any new-page-tabs that are not the special one or the current one.
+			chrome.tabs.getSelected(null, function(tab) {
+				for(var i =  window.tabs.length - 1; i > 1; i--) {
+					if(window.tabs[i].id !== tab.id && window.tabs[i].url === "chrome://newtab/") {
+						chrome.tabs.remove(window.tabs[i].id);
+					}
+				}
+			});
+		});
+	}
+}
 
-// var reopen_tab_id = null;
-// var creating_tab = false;
-// var activate_tab = false;
+// If our special tab was the one activated, then switch away, not for you!
+function tabActivated(activeInfo) {
+	chrome.windows.getCurrent({populate: true}, function(window){
+		if(!creatingTab && window.tabs[0].id === activeInfo.tabId && window.tabs[0].pinned && window.tabs[0].url === "chrome://newtab/") {
+			chrome.tabs.update(window.tabs[1].id, {active: true});
+		}
+	});
+}
 
-// function keep_two() {
-	// chrome.windows.getAll({populate: true}, function(windows) {
-		// var tab_count = 0;
-		// for(var i = 0; i < windows.length; i++) {
-			// var w = windows[i];
-			// tab_count += w.tabs.length;
-		// }
-		// if(tab_count == 1 && !creating_tab) {
-			// creating_tab = true;
+// Boot it up and schedule functions for events.
+keepSpecialPinned();
+chrome.tabs.onCreated.addListener(keepSpecialPinned);
+chrome.tabs.onRemoved.addListener(keepSpecialPinned);
+chrome.tabs.onActivated.addListener(tabActivated);
 
-			// if(w.tabs[0].pinned == true) {
-				// activate_tab = true;
-			// } else {
-				// activate_tab = false;
-			// }
-
-			// chrome.tabs.create({active: activate_tab, pinned: (w.tabs[0].pinned == false)}, function(tab){
-				// // save this tab id in case of Close Tabs to The Right.
-				// // Chrome will close this tab if that is the case even it's just being
-				// // added.
-				// reopen_tab_id = tab.id;
-				// creating_tab = false;
-			// });
-		// }
-	// });
-// }
-
-// function close_one(tab) {
-	// chrome.tabs.getAllInWindow(tab.windowId, function(tabs){
-		// if(tabs.length != 3) {
-			// return;
-		// }
-		
-		// for(var i =0 , closed = 0; i < tabs.length && closed < (tabs.length - 2); i++) {
-			// if(tabs[i].id == tab.id) { //Do not close new tab which is chrome://newtab
-				// continue;
-			// }
-			// if(tabs[i].url == 'chrome://newtab/' && tabs[i].pinned) {
-				// chrome.tabs.remove(tabs[i].id);
-				// return;
-			// }
-		// }
-	// });
-// }
-
-// keep_two();
-
-// chrome.tabs.onRemoved.addListener(function(tabId) {
-	// if(reopen_tab_id == tabId) {
-		// setTimeout(keep_two, 100);
-		// return;
-	// }
-	
-	// keep_two();
-// });
-
-// chrome.tabs.onCreated.addListener(function(tab) {
-	// if(tab.id != reopen_tab_id) {
-		// reopen_tab_id = null;
-	// }
-
-	// close_one(tab);
-// });
-
-// chrome.tabs.onActivated.addListener(function(tab) {
-	// chrome.windows.getAll({populate: true}, function(windows){
-		// var tab_count = 0;
-		// for(var i = 0; i < windows.length; i++) {
-			// var w = windows[i];
-			// tab_count += w.tabs.length;
-		// }
-
-		// if (tab_count == 2 && w.tabs[0].pinned && w.tabs[0].id == tab.tabId && w.tabs[0].url == 'chrome://newtab/') {
-			// chrome.tabs.update(w.tabs[1].id, {active: true});
-		// }
-	// });
-// });
