@@ -67,11 +67,12 @@ function keepSpecialPinned() {
 // }
 
 function getTotalNumberOfTabs(windows) {
-	var tab_count;
+	var tab_count = 0;
 	for (var i = 0;  i < windows.length; i++) {
-		var w = windows[i];
-		tab_count += w.tabs.length;
+		tab_count += windows[i].tabs.length;
 	}
+	
+	// alert(tab_count);
 	
 	return tab_count;
 }
