@@ -13,7 +13,7 @@ function keepSpecialPinned() {
 				}
 			}
 			
-			// Don't check firstt ab of apps and popups.
+			// Don't check first tab of apps and popups.
 			if(window.type === "normal") {
 				// Make sure we've got our special tab in place.
 				var firstTab = window.tabs[0];
@@ -38,7 +38,7 @@ function keepSpecialPinned() {
 			
 			// Close any new-page-tabs that are not the special one or the current one.
 			chrome.tabs.getSelected(null, function(tab) {
-				for(var i =  window.tabs.length - 1; i > 1; i--) {
+				for(var i =  window.tabs.length - 1; i > 0; i--) {
 					if(window.tabs[i].id !== tab.id && window.tabs[i].url === "chrome://newtab/") {
 						chrome.tabs.remove(window.tabs[i].id);
 					}
