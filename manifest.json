@@ -1,6 +1,6 @@
 ﻿{
   "name": "Keep One Pinned Tab",
-  "version": "1.2",
+  "version": "1.3",
   "description": "A Chrome extension to keep one (unfocused) pinned tab open at all times. Used to prevent Chrome closing with last tab.",
   "manifest_version": 2,
   "permissions": [ "tabs" ],
