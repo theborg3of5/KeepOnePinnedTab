@@ -51,5 +51,4 @@ function getTotalNumberOfTabs(windows) {
 keepSpecialPinned();
 chrome.tabs.onCreated.addListener(keepSpecialPinned);
 chrome.tabs.onRemoved.addListener(keepSpecialPinned);
-chrome.tabs.onUpdated.addListener(tabUpdated);
 
