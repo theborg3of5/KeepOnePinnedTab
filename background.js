@@ -17,7 +17,7 @@ function updateTabs() {
 			newTabPage = items[newTabPageSyncKey];
 
 			// If not set (or key not defined), fall back on the default.
-			if( (newTabPage == "undefined") || (newTabPage == "") ) newTabPage = defaultNewTabPage			
+			if( (newTabPage == undefined) || (newTabPage == "") ) newTabPage = defaultNewTabPage
 			
 			keepSpecialPinned();
 		});
