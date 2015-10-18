@@ -1,5 +1,4 @@
 ﻿var creatingTab = false;
-// var goToSecond = true;
 
 function keepSpecialPinned() {
 	if(!creatingTab) {
@@ -35,44 +34,15 @@ function keepSpecialPinned() {
 					});
 				}
 			}
-			
-			// Close any new-page-tabs that are not the special one or the current one.
-			// chrome.tabs.getSelected(null, function(tab) {
-				// for(var i =  window.tabs.length - 1; i > 0; i--) {
-					// if(window.tabs[i].id !== tab.id && window.tabs[i].url === "chrome://newtab/") {
-						// chrome.tabs.remove(window.tabs[i].id);
-					// }
-				// }
-			// });
 		});
 	}
 }
-
-// // If our special tab was the one activated, then switch away, not for you!
-// function tabActivated(activeInfo) {
-	// chrome.windows.getCurrent({populate: true}, function(window){
-		// if(!creatingTab && window.tabs[0].id === activeInfo.tabId && window.tabs[0].pinned && window.tabs[0].url === "chrome://newtab/") {
-		
-			// // Alternate going to the second or last tabs when this one is activated.
-			// if(goToSecond) {
-				// chrome.tabs.update(window.tabs[1].id, {active: true});
-				// goToSecond = false;
-			// } else {
-				// chrome.tabs.update(window.tabs[window.tabs.length - 1].id, {active: true});
-				// goToSecond = true;
-			// }
-			
-		// }
-	// });
-// }
 
 function getTotalNumberOfTabs(windows) {
 	var tab_count = 0;
 	for (var i = 0;  i < windows.length; i++) {
 		tab_count += windows[i].tabs.length;
 	}
-	
-	// alert(tab_count);
 	
 	return tab_count;
 }
@@ -82,5 +52,4 @@ keepSpecialPinned();
 chrome.tabs.onCreated.addListener(keepSpecialPinned);
 chrome.tabs.onRemoved.addListener(keepSpecialPinned);
 chrome.tabs.onUpdated.addListener(tabUpdated);
-// chrome.tabs.onActivated.addListener(tabActivated);
 
