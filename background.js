@@ -1,61 +1,78 @@
-﻿var creatingTab = false;
-var loadedNewTabPage = false;
-var newTabPage = "";
+﻿var PinnedTabPage_Default    = "Default";
+var PinnedTabPage_BlankLight = "BlankLight";
+var PinnedTabPage_BlankDark  = "BlankDark";
+var PinnedTabPage_Custom     = "Custom";
 
-var newTabPageSyncKey = "KeepOnePinnedTab_NewTabPage";
-var defaultNewTabPage = "chrome://newtab/";
+var PinnedTabURL_Default    = "chrome://newtab/";
+var PinnedTabURL_BlankLight = chrome.extension.getURL("Resources/blankLight.html");
+var PinnedTabURL_BlankDark  = chrome.extension.getURL("Resources/blankDark.html");
 
-// Main function that's run when tabs are opened/closed - acts as a switch that makes sure that we have newTabPage populated before calling keepSpecialPinned().
+var pinnedTabURL = "";
+
+// Main function that's run when tabs are opened/closed - acts as a switch that makes sure that we have pinnedTabURL populated before calling keepSpecialPinned().
 function updateTabs() {
-	// If we already have the new tab page loaded from the chrome sync storage, we can just go.
-	if(loadedNewTabPage) {
-		keepSpecialPinned();
-	
-	// Otherwise, we have to asynchronously get the new tab page URL, then do our logic once we have it.
-	} else {
-		chrome.storage.sync.get(newTabPageSyncKey, function(items) {
-			newTabPage = items[newTabPageSyncKey];
-
-			// If not set (or key not defined), fall back on the default.
-			if( (newTabPage == undefined) || (newTabPage == "") ) newTabPage = defaultNewTabPage
-			
-			keepSpecialPinned();
-		});
-	}
+	// Asynchronously get the new tab page URL, then do our logic once we have it.
+	chrome.storage.sync.get(
+		[
+			"KeepOnePinnedTab_PinnedTabPage",
+			"KeepOnePinnedTab_CustomPinnedTabURL",
+			"KeepOnePinnedTab_NewTabPage" // Old
+		],
+		function(items) {
+			pinnedTabURL = calculatePinnedURL(items);
+			keepSpecialPinned(pinnedTabURL);
+		}
+	);
 }
 
 // If this is the correct kind of window (normal), make sure that there's a pinned tab with the given URL, plus at least one other tab.
-function keepSpecialPinned() {
-	// Bail if we're already opening a tab (to avoid infinite opening of tabs).
-	if(creatingTab) return;
-	
+function keepSpecialPinned(urlToPin) {
 	// Get the current window, ignoring app and popup windows.
 	chrome.windows.getLastFocused({populate: true, windowTypes: ["normal"]}, function(focusedWindow){
 		// Bail if no suitable window is focused.
-		if(focusedWindow == undefined) return;
+		if(focusedWindow == undefined)
+			return;
 		
 		// Make sure we've got our special tab in place.
 		var firstTab = focusedWindow.tabs[0];
-		if(!firstTab.pinned || (firstTab.url.indexOf(newTabPage) == -1) ) {
+		if(!firstTab.pinned || (firstTab.url.indexOf(urlToPin) == -1) ) {
 			// Spawn our special tab. Stick it at the beginning, pin it, and don't focus it.
-			creatingTab = true;
-			chrome.tabs.create({"index": 0, "pinned": true, "active": false, "url": newTabPage}, function(tab) {
-				creatingTab = false;
+			chrome.tabs.create({
+				"index": 0, 
+				"pinned": true, 
+				"active": false, 
+				"url": urlToPin
 			});
 		}
 		
 		// Ensure that there's at least one tab after our special one.
-		if((focusedWindow.tabs.length == 1) && !creatingTab) {
-			creatingTab = true;
-			chrome.tabs.create({"active": true}, function(tab){
-				creatingTab = false;
-			});
-		}
+		if(focusedWindow.tabs.length == 1)
+			chrome.tabs.create({"active": true});
 	});
+}
+
+// Figures out the URL that should be kept always pinned, based on Chrome sync storage.
+function calculatePinnedURL(items) {
+	var pageToPin = items["KeepOnePinnedTab_PinnedTabPage"];
+	
+	// Old style of storage (remove eventually)
+	var oldStyleURL = items["KeepOnePinnedTab_NewTabPage"];
+	if( (oldStyleURL != undefined) && (oldStyleURL != "") )
+		return oldStyleURL;
+	
+	if(pageToPin == PinnedTabPage_Default)
+		return PinnedTabURL_Default;
+	if(pageToPin == PinnedTabPage_BlankLight)
+		return PinnedTabURL_BlankLight;
+	if(pageToPin == PinnedTabPage_BlankDark)
+		return PinnedTabURL_BlankDark;
+	if(pageToPin == PinnedTabPage_Custom)
+		return items["KeepOnePinnedTab_CustomPinnedTabURL"];
+	
+	return PinnedTabURL_Default;
 }
 
 // Boot it up and schedule functions for events.
 updateTabs();
-chrome.tabs.onCreated.addListener(updateTabs);
 chrome.tabs.onRemoved.addListener(updateTabs);
 
