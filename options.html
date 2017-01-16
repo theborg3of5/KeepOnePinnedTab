@@ -4,13 +4,29 @@
 	</head>
 
 	<body>
-		<p>Please enter the URL for the page that you would like to keep pinned at all times.</p>
+		<p>Please choose the URL for the page that you would like to keep pinned at all times:</p>
 		
-		<p>
-			URL of the page to keep pinned: 
-			<input type="text" id="newTabPage" />
-		</p>
+		<label>
+			<input type="radio" name="PinnedTabPage" value="Default"/> Default
+		</label>
 		
+		<br />
+		<label>
+			<input type="radio" name="PinnedTabPage" value="BlankLight" /> Blank light
+		</label>
+		
+		<br />
+		<label>
+			<input type="radio" name="PinnedTabPage" value="BlankDark" /> Blank dark
+		</label>
+		
+		<br />
+		<label>
+			<input type="radio" name="PinnedTabPage" value="Custom" /> Custom: <input type="text" id="customURL" />
+		</label>
+		<span id="customWarning">If you pick Custom, make sure that the URL that you put here is exactly the same as what appears in Chrome's URL bar.</span>
+		
+		<br /><br />
 		<button id="save">Save</button>
 		
 		<br /><br />

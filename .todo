@@ -1,2 +1,4 @@
-Add new radio button options for non-path pages
-	Both dark and light options?
+Remove old key support after a month or two
+Create central constants file for different values of which page to use?
+	For page -> URL mapping, switch to 1 constant array instead of individual values?
+Make warning message about custom option dynamic, only when that option is selected?
