@@ -2,3 +2,10 @@ Remove old key support after a month or two
 Create central constants file for different values of which page to use?
 	For page -> URL mapping, switch to 1 constant array instead of individual values?
 Make warning message about custom option dynamic, only when that option is selected?
+Add optional behavior to switch away from the tab in question immediately?
+	chrome.tabs.onActivated.addListener(tabActivated);
+Grab settings from storage only when changed, like other extension does
+	chrome.storage.onChanged.addListener(updateOptions);
+	Only change tab URLs that match our old URL?
+Add setting for whether it will immediately apply to detached tabs
+	Only add handler for that if it's checked.
