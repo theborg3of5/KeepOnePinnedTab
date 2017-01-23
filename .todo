@@ -9,3 +9,5 @@ Grab settings from storage only when changed, like other extension does
 	Only change tab URLs that match our old URL?
 Add setting for whether it will immediately apply to detached tabs
 	Only add handler for that if it's checked.
+Maybe it makes sense to check all windows per trigger?
+	Would help with detach case, if we're not handling it directly.
