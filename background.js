@@ -1,22 +1,13 @@
-﻿var PinnedTabPage_Default    = "Default";
-var PinnedTabPage_BlankLight = "BlankLight";
-var PinnedTabPage_BlankDark  = "BlankDark";
-var PinnedTabPage_Custom     = "Custom";
-
-var PinnedTabURL_Default    = "chrome://newtab/";
-var PinnedTabURL_BlankLight = chrome.extension.getURL("Resources/blankLight.html");
-var PinnedTabURL_BlankDark  = chrome.extension.getURL("Resources/blankDark.html");
-
-var pinnedTabURL = "";
+﻿var pinnedTabURL = "";
 
 // Main function that's run when tabs are opened/closed - acts as a switch that makes sure that we have pinnedTabURL populated before calling keepSpecialPinned().
 function updateTabs() {
 	// Asynchronously get the new tab page URL, then do our logic once we have it.
 	chrome.storage.sync.get(
 		[
-			"KeepOnePinnedTab_PinnedTabPage",
-			"KeepOnePinnedTab_CustomPinnedTabURL",
-			"KeepOnePinnedTab_NewTabPage" // Old
+			KOPT_Page,
+			KOPT_CustomURL,
+			KOPT_LegacyKey // Old
 		],
 		function(items) {
 			pinnedTabURL = calculatePinnedURL(items);
@@ -53,10 +44,10 @@ function keepSpecialPinned(urlToPin) {
 
 // Figures out the URL that should be kept always pinned, based on Chrome sync storage.
 function calculatePinnedURL(items) {
-	var pageToPin = items["KeepOnePinnedTab_PinnedTabPage"];
+	var pageToPin = items[KOPT_Page];
 	
 	// Old style of storage (remove eventually)
-	var oldStyleURL = items["KeepOnePinnedTab_NewTabPage"];
+	var oldStyleURL = items[KOPT_LegacyKey];
 	if( (oldStyleURL != undefined) && (oldStyleURL != "") )
 		return oldStyleURL;
 	
@@ -67,7 +58,7 @@ function calculatePinnedURL(items) {
 	if(pageToPin == PinnedTabPage_BlankDark)
 		return PinnedTabURL_BlankDark;
 	if(pageToPin == PinnedTabPage_Custom)
-		return items["KeepOnePinnedTab_CustomPinnedTabURL"];
+		return items[KOPT_CustomURL];
 	
 	return PinnedTabURL_Default;
 }

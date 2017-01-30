@@ -1,9 +1,4 @@
-﻿var PinnedTabPage_Default    = "Default";
-var PinnedTabPage_BlankLight = "BlankLight";
-var PinnedTabPage_BlankDark  = "BlankDark";
-var PinnedTabPage_Custom     = "Custom";
-
-// Saves options to chrome sync storage.
+﻿// Saves options to chrome sync storage.
 function saveOptions() {
 	var customURL;
 	
@@ -12,9 +7,9 @@ function saveOptions() {
 		customURL = document.querySelector("#customURL").value;
 	
 	chrome.storage.sync.set({
-		"KeepOnePinnedTab_PinnedTabPage": pinnedTabPage,
-		"KeepOnePinnedTab_CustomPinnedTabURL": customURL,
-		"KeepOnePinnedTab_NewTabPage": "" // Old style, clear it out when we save. Should have fixed it to new style in actual elements via loadOptions().
+		KOPT_Page:      pinnedTabPage,
+		KOPT_CustomURL: customURL,
+		KOPT_LegacyKey: "" // Old style, clear it out when we save. Should have fixed it to new style in actual elements via loadOptions().
 	});
 	
 	// Update status to let user know options were saved.
@@ -29,16 +24,16 @@ function saveOptions() {
 function loadOptions() {
 	chrome.storage.sync.get(
 		[
-			"KeepOnePinnedTab_PinnedTabPage",
-			"KeepOnePinnedTab_CustomPinnedTabURL",
-			"KeepOnePinnedTab_NewTabPage" // Old
+			KOPT_Page,
+			KOPT_CustomURL,
+			KOPT_LegacyKey // Old
 		],
 		function(items) {
-			var pinnedTabPage = items["KeepOnePinnedTab_PinnedTabPage"];
-			var customURL     = items["KeepOnePinnedTab_CustomPinnedTabURL"];
+			var pinnedTabPage = items[KOPT_Page];
+			var customURL     = items[KOPT_CustomURL];
 			
 			// Old style of storage (remove eventually)
-			var oldStyleURL = items["KeepOnePinnedTab_NewTabPage"];
+			var oldStyleURL = items[KOPT_LegacyKey];
 			if((oldStyleURL != undefined) && (oldStyleURL != "")) {
 				pinnedTabPage = PinnedTabPage_Custom;
 				customURL = oldStyleURL;
