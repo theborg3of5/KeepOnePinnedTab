@@ -1,5 +1,5 @@
 Remove old key support after a month or two
-Actually implement blankLight choice
+When save options updates tabs, suppress extra tab appearing?
 Make warning message about custom option dynamic, only when that option is selected?
 Add optional behavior to switch away from the tab in question immediately?
 	chrome.tabs.onActivated.addListener(tabActivated);

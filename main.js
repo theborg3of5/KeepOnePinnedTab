@@ -16,7 +16,7 @@ var KOPT_LegacyKey = "KeepOnePinnedTab_NewTabPage"; // Legacy way of storing set
 
 var pinnedTabURL = "";
 
-// Main function that's run when tabs are opened/closed - acts as a switch that makes sure that we have pinnedTabURL populated before calling keepSpecialPinnedTab().
+// Main function that's run when tabs are opened/closed - acts as a switch that makes sure that we have pinnedTabURL populated before calling keepPinnedTab().
 function updateTabs() {
 	// Asynchronously get the new tab page URL, then do our logic once we have it.
 	chrome.storage.sync.get(
@@ -27,7 +27,7 @@ function updateTabs() {
 		],
 		function(items) {
 			pinnedTabURL = calculatePinnedURL(items);
-			keepSpecialPinnedTab(pinnedTabURL);
+			keepPinnedTab(pinnedTabURL);
 		}
 	);
 }
@@ -54,27 +54,68 @@ function calculatePinnedURL(items) {
 }
 
 // If this is the correct kind of window (normal), make sure that there's a pinned tab with the given URL, plus at least one other tab.
-function keepSpecialPinnedTab(urlToPin) {
+function keepPinnedTab(urlToPin) {
 	// Get the current window, ignoring app and popup windows.
-	chrome.windows.getLastFocused({populate: true, windowTypes: ["normal"]}, function(focusedWindow){
-		// Bail if no suitable window is focused.
-		if(focusedWindow == undefined)
-			return;
-		
-		// Make sure we've got our special tab in place.
-		var firstTab = focusedWindow.tabs[0];
-		if(!firstTab.pinned || (firstTab.url.indexOf(urlToPin) == -1) ) {
-			// Spawn our special tab. Stick it at the beginning, pin it, and don't focus it.
-			chrome.tabs.create({
-				"index":  0, 
-				"pinned": true, 
-				"active": false, 
-				"url":    urlToPin
-			});
+	chrome.windows.getLastFocused(
+		{
+			"populate":    true, 
+			"windowTypes": ["normal"]
+		},
+		function(focusedWindow){
+			pinSpecialTab(focusedWindow, urlToPin);
 		}
-		
-		// Ensure that there's at least one tab after our special one.
-		if(focusedWindow.tabs.length == 1)
-			chrome.tabs.create({"active": true});
-	});
+	);
+}
+
+// Make sure we've got our special tab in place.
+function pinSpecialTab(targetWindow, urlToPin) {
+	if(targetWindow == undefined)
+		return;
+	
+	var windowId = targetWindow.id;
+	var firstTab = targetWindow.tabs[0];
+	if(firstTab.pinned && (firstTab.url.indexOf(urlToPin) != -1)) {
+		openAdditionalTab(windowId);
+		return; // Our desired tab already exists.
+	}
+	
+	// Spawn our special tab. Stick it at the beginning and pin it, but don't focus it.
+	chrome.tabs.create(
+		{
+			"index":  0, 
+			"pinned": true, 
+			"active": false, 
+			"url":    urlToPin
+		},
+		function(tab) {
+			openAdditionalTab(windowId); // Must be fired only once the new tab is created, so that our tab count later is accurate.
+		}
+	);
+}
+
+function openAdditionalTab(windowId) {
+	// Get a new reference to the window, since the number of tabs will have changed after opening the special tab.
+	chrome.windows.get(
+		windowId,
+		{
+			"populate": true
+		},
+		function(targetWindow) {
+			openAdditionalTabInWindow(targetWindow);
+		}
+	);
+}
+
+function openAdditionalTabInWindow(targetWindow) {
+	if(targetWindow == undefined)
+		return;
+	
+	if(targetWindow.tabs.length > 1)
+		return;
+	
+	chrome.tabs.create(
+		{
+			"active": true
+		}
+	);
 }
