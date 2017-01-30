@@ -2,9 +2,8 @@
 var pinnedTabURL = "";
 
 
-
+// Get our settings for what URL to use, and kick everything off.
 function startup() {
-	// Get our settings for what URL to use.
 	chrome.storage.sync.get(
 		[
 			KOPT_Page,
@@ -66,6 +65,9 @@ function keepSpecialTabs(targetWindow) {
 
 
 function keepPinnedTab(targetWindow) {
+	if(pinnedTabURL == "")
+		return;
+	
 	if(needPinnedTab(targetWindow))
 		createPinnedTab(targetWindow);
 }
