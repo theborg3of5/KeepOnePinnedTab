@@ -1,12 +1,10 @@
 Remove old key support after a month or two
-When save options updates tabs, suppress extra tab appearing?
+	OR: phase out old settings immediately, in tab-creating logic.
+
 Make warning message about custom option dynamic, only when that option is selected?
+
 Add optional behavior to switch away from the tab in question immediately?
 	chrome.tabs.onActivated.addListener(tabActivated);
-Grab settings from storage only when changed, like other extension does
+Grab settings from storage when changed, like other extension does
 	chrome.storage.onChanged.addListener(updateOptions);
 	Only change tab URLs that match our old URL?
-Add setting for whether it will immediately apply to detached tabs
-	Only add handler for that if it's checked.
-Maybe it makes sense to check all windows per trigger?
-	Would help with detach case, if we're not handling it directly.
