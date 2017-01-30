@@ -1,6 +1,6 @@
 ﻿var pinnedTabURL = "";
 
-// Main function that's run when tabs are opened/closed - acts as a switch that makes sure that we have pinnedTabURL populated before calling keepSpecialPinned().
+// Main function that's run when tabs are opened/closed - acts as a switch that makes sure that we have pinnedTabURL populated before calling keepSpecialPinnedTab().
 function updateTabs() {
 	// Asynchronously get the new tab page URL, then do our logic once we have it.
 	chrome.storage.sync.get(
@@ -11,13 +11,13 @@ function updateTabs() {
 		],
 		function(items) {
 			pinnedTabURL = calculatePinnedURL(items);
-			keepSpecialPinned(pinnedTabURL);
+			keepSpecialPinnedTab(pinnedTabURL);
 		}
 	);
 }
 
 // If this is the correct kind of window (normal), make sure that there's a pinned tab with the given URL, plus at least one other tab.
-function keepSpecialPinned(urlToPin) {
+function keepSpecialPinnedTab(urlToPin) {
 	// Get the current window, ignoring app and popup windows.
 	chrome.windows.getLastFocused({populate: true, windowTypes: ["normal"]}, function(focusedWindow){
 		// Bail if no suitable window is focused.

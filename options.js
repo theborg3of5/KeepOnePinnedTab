@@ -46,8 +46,6 @@ function loadOptions() {
 			var optionElement = document.querySelector("input[name=PinnedTabPage][value=" + pinnedTabPage + "]");
 			if(optionElement)
 				optionElement.checked = true;
-			else
-				alert("curses " + pinnedTabPage);
 			
 			if(pinnedTabPage == PinnedTabPage_Custom)
 				document.getElementById("customURL").value = customURL;
