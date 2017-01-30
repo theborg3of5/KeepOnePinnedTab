@@ -6,11 +6,13 @@ function saveOptions() {
 	if(pinnedTabPage == PinnedTabPage_Custom)
 		customURL = document.querySelector("#customURL").value;
 	
-	chrome.storage.sync.set({
-		KOPT_Page:      pinnedTabPage,
-		KOPT_CustomURL: customURL,
-		KOPT_LegacyKey: "" // Old style, clear it out when we save. Should have fixed it to new style in actual elements via loadOptions().
-	});
+	chrome.storage.sync.set(
+		{
+			[KOPT_Page]:      pinnedTabPage,
+			[KOPT_CustomURL]: customURL,
+			[KOPT_LegacyKey]: "" // Old style, clear it out when we save. Should have fixed it to new style in actual elements via loadOptions().
+		}
+	);
 	
 	// Update status to let user know options were saved.
 	var status = document.getElementById("status");

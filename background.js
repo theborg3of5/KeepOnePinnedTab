@@ -29,10 +29,10 @@ function keepSpecialPinnedTab(urlToPin) {
 		if(!firstTab.pinned || (firstTab.url.indexOf(urlToPin) == -1) ) {
 			// Spawn our special tab. Stick it at the beginning, pin it, and don't focus it.
 			chrome.tabs.create({
-				"index": 0, 
+				"index":  0, 
 				"pinned": true, 
 				"active": false, 
-				"url": urlToPin
+				"url":    urlToPin
 			});
 		}
 		
