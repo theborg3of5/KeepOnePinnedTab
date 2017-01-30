@@ -20,6 +20,8 @@ function saveOptions() {
 	setTimeout(function() {
 		status.innerHTML = "";
 	}, 750);
+	
+	updateTabs();
 }
 
 // Restores select box state to saved value from chrome sync storage.
