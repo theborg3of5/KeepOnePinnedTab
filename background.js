@@ -67,6 +67,8 @@ function keepSpecialTabs(targetWindow) {
 function keepPinnedTab(targetWindow) {
 	if(pinnedTabURL == "")
 		return;
+	if(targetWindow.type != "normal")
+		return;
 	
 	if(needPinnedTab(targetWindow))
 		createPinnedTab(targetWindow);
@@ -92,20 +94,24 @@ function isOurTab(tab) {
 	return true;
 }
 
-function createPinnedTab(targetWindow) { // GDB TODO - take specific window into account.
+function createPinnedTab(targetWindow) {
 	// Spawn our special tab. Stick it at the beginning and pin it, but don't focus it.
 	chrome.tabs.create(
 		{
-			"index":  0, 
-			"pinned": true, 
-			"active": false, 
-			"url":    pinnedTabURL
+			"windowId": targetWindow.id,
+			"url":      pinnedTabURL,
+			"index":    0,
+			"pinned":   true,
+			"active":   false
 		}
 	);
 }
 
 
 function keepAdditionalTab(targetWindow) {
+	if(targetWindow.type != "normal")
+		return;
+	
 	if(needAdditionalTab(targetWindow))
 		createAdditionalTab(targetWindow);
 }

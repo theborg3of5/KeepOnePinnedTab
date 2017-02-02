@@ -1,4 +1,5 @@
-Bug: adding extra pinned tab to first window when opening a new one
+Clean unused stuff out of main.js
+	Maybe rename back to constants.js?
 
 Remove old key support after a month or two
 	OR: phase out old settings immediately, in tab-creating logic.
