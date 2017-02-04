@@ -1,6 +1,3 @@
-Clean unused stuff out of main.js
-	Maybe rename back to constants.js?
-
 Remove old key support after a month or two
 	OR: phase out old settings immediately, in tab-creating logic.
 
@@ -8,6 +5,4 @@ Make warning message about custom option dynamic, only when that option is selec
 
 Add optional behavior to switch away from the tab in question immediately?
 	chrome.tabs.onActivated.addListener(tabActivated);
-Grab settings from storage when changed, like other extension does
-	chrome.storage.onChanged.addListener(updateOptions);
-	Only change tab URLs that match our old URL?
+
