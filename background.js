@@ -1,9 +1,10 @@
 ﻿
 var pinnedTabURL = "";
+var nextCreateTabTriggersKeep = false;
 
 
 // Get our settings for what URL to use, and kick everything off.
-function startup() {
+function updateAll() {
 	chrome.storage.sync.get(
 		[
 			KOPT_Page,
@@ -141,8 +142,6 @@ function createAdditionalTab(targetWindow) {
 	);
 }
 
-var nextCreateTabTriggersKeep = false;
-
 function windowCreated(newWindow) {
 	// console.log("windowCreated");
 	
@@ -171,6 +170,7 @@ function tabDetached(tabId, detachInfo) {
 	);
 }
 
+// If we just dragged the last tab away from a window (so only our pinned tab is left), close it.
 function closeWindowOnDetach(detachedWindow) {
 	if(!detachedWindow)
 		return;
@@ -194,7 +194,7 @@ function tabCreated(tab) {
 }
 
 
-startup();
+updateAll();
 
 
 chrome.windows.onCreated.addListener(windowCreated);
