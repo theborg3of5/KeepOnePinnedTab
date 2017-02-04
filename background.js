@@ -1,10 +1,9 @@
-﻿
-var pinnedTabURL = "";
+﻿var pinnedTabURL = "";
 var nextCreateTabTriggersKeep = false;
 
 
-// Get our settings for what URL to use, and kick everything off.
-function updateAll() {
+
+function startup() {
 	chrome.storage.sync.get(
 		[
 			KOPT_Page,
@@ -12,15 +11,23 @@ function updateAll() {
 			KOPT_LegacyKey // Old
 		],
 		function(items) {
-			pinnedTabURL = getPinnedURL(items);
-			updateAllWindows();
+			pinnedTabURL = getPinnedURLFromStorage(items);
+			
+			chrome.windows.getAll(
+				{
+					"populate":    true, 
+					"windowTypes": ["normal"]
+				},
+				function(windows){
+					for(var i = 0; i < windows.length; i++)
+						keepSpecialTabs(windows[i].id);
+				}
+			);
 		}
 	);	
 }
 
-
-// Figures out the URL that should be kept always pinned, based on Chrome sync storage.
-function getPinnedURL(items) {
+function getPinnedURLFromStorage(items) {
 	var pageToPin = items[KOPT_Page];
 	
 	// Old style of storage (remove eventually)
@@ -30,7 +37,6 @@ function getPinnedURL(items) {
 	
 	return getURLFromPage(pageToPin);
 }
-
 function getURLFromPage(pageToPin) {
 	if(pageToPin == PinnedTabPage_Default)
 		return PinnedTabURL_Default;
@@ -43,21 +49,6 @@ function getURLFromPage(pageToPin) {
 	
 	return PinnedTabURL_Default;
 }
-
-
-function updateAllWindows() {
-	chrome.windows.getAll(
-		{
-			"populate":    true, 
-			"windowTypes": ["normal"]
-		},
-		function(windows){
-			for(var i = 0; i < windows.length; i++)
-				keepSpecialTabs(windows[i].id);
-		}
-	);
-}
-
 
 function keepSpecialTabs(targetWindowId) {
 	if(!targetWindowId)
@@ -75,7 +66,6 @@ function keepSpecialTabs(targetWindowId) {
 		}
 	);
 }
-
 
 function keepPinnedTab(targetWindow) {
 	if(pinnedTabURL == "")
@@ -95,14 +85,14 @@ function needPinnedTab(targetWindow) {
 	
 	return true;
 }
-function isOurTab(tab) {
+function isOurTab(tab, urlToCheck = pinnedTabURL) {
 	if(!tab)
 		return false;
 	
 	if(!tab.pinned)
 		return false;
 	
-	if(tab.url.indexOf(pinnedTabURL) == -1)
+	if(tab.url.indexOf(urlToCheck) == -1)
 		return false;
 	
 	return true;
@@ -119,7 +109,6 @@ function createPinnedTab(targetWindow) {
 		}
 	);
 }
-
 
 function keepAdditionalTab(targetWindow) {
 	if(targetWindow.type != "normal")
@@ -142,15 +131,12 @@ function createAdditionalTab(targetWindow) {
 	);
 }
 
+
 function windowCreated(newWindow) {
-	// console.log("windowCreated");
-	
 	nextCreateTabTriggersKeep = true;
 }
 
 function tabRemoved(tabId, removeInfo) {
-	// console.log("tabRemoved");
-	
 	if(removeInfo.isWindowClosing)
 		return;
 	
@@ -158,20 +144,15 @@ function tabRemoved(tabId, removeInfo) {
 }
 
 function tabDetached(tabId, detachInfo) {
-	// console.log("tabDetached");
-	
-	// If we just detached a tab, and the only thing left is our pinned tab, just close that window.
 	chrome.windows.get(
 		detachInfo.oldWindowId,
 		{
 			"populate": true
 		},
-		closeWindowOnDetach
+		closeWindowOnDetachLastRealTab
 	);
 }
-
-// If we just dragged the last tab away from a window (so only our pinned tab is left), close it.
-function closeWindowOnDetach(detachedWindow) {
+function closeWindowOnDetachLastRealTab(detachedWindow) {
 	if(!detachedWindow)
 		return;
 	
@@ -185,27 +166,70 @@ function closeWindowOnDetach(detachedWindow) {
 }
 
 function tabCreated(tab) {
-	// console.log("tabCreated");
-	
 	if(nextCreateTabTriggersKeep) {
 		nextCreateTabTriggersKeep = false;
 		keepSpecialTabs(tab.windowId);
 	}
 }
 
+function storageChanged() {
+	chrome.storage.sync.get(
+		[
+			KOPT_Page,
+			KOPT_CustomURL,
+			KOPT_LegacyKey // Old
+		],
+		function(items) {
+			var oldPinnedURL = pinnedTabURL;
+			pinnedTabURL = getPinnedURLFromStorage(items);
+			
+			if(oldPinnedURL == pinnedTabURL)
+				return;
+			
+			convertAllWindows(oldPinnedURL, pinnedTabURL);
+		}
+	);
+}
+function convertAllWindows(oldPinnedURL, newPinnedURL) {
+	chrome.windows.getAll(
+		{
+			"populate":    true, 
+			"windowTypes": ["normal"]
+		},
+		function(windows){
+			for(var i = 0; i < windows.length; i++) {
+				convertWindow(windows[i], oldPinnedURL, newPinnedURL);
+			}
+		}
+	);
+}
+function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
+	var firstTab = targetWindow.tabs[0];
+	if(!isOurTab(firstTab, oldPinnedURL))
+		return;
+	
+	chrome.tabs.update(
+		firstTab.id,
+		{
+			"url": newPinnedURL
+		}
+	);
+}
 
-updateAll();
+
+
+startup();
+
 
 
 chrome.windows.onCreated.addListener(windowCreated);
-chrome.tabs.onRemoved.addListener(tabRemoved);
+
+// chrome.tabs.onActivated.addListener(tabActivated); // GDB TODO - implement to have setting, so that the tab in question shoves focus away from itself.
 chrome.tabs.onCreated.addListener(tabCreated);
 chrome.tabs.onDetached.addListener(tabDetached);
+chrome.tabs.onRemoved.addListener(tabRemoved);
 
-// chrome.storage.onChanged.addListener(updateOptions);
-// chrome.tabs.onActivated.addListener(tabActivated); // GDB TODO - implement to have setting, so that the tab in question shoves focus away from itself.
-
-
+chrome.storage.onChanged.addListener(storageChanged);
 
 
 
@@ -213,49 +237,9 @@ chrome.tabs.onDetached.addListener(tabDetached);
 
 
 
-// function updateOptions() {
-	// chrome.storage.sync.get(
-		// [
-			// KOPT_Page,
-			// KOPT_CustomURL,
-			// KOPT_LegacyKey // Old
-		// ],
-		// function(items) {
-			// // oldPinnedURL = ? // GDB TODO
-			// if(pinnedTabURL == newURLToPin)
-				// return
-			
-			// newURLToPin = getPinnedURL(items);
-			// convertAllWindows(pinnedTabURL, newURLToPin);
-		// }
-	// );
-// }
 
-// function convertAllWindows() {
-	// chrome.windows.getAll(
-		// {
-			// "populate":    true, 
-			// "windowTypes": ["normal"]
-		// },
-		// function(windows){
-			// for(var i = 0; i < windows.length; i++)
-				// keepPinnedTab(windows[i]);
-		// }
-	// );
-// }
 
-// function convertWindow(targetWindow, oldPinnedURL, newURLToPin) {
-	// var firstTab = targetWindow.tabs[0];
-	// if(!isOurTab(firstTab)) // GDB TODO - pass oldPinnedURL and modularize better?
-		// return;
-	
-	// chrome.tabs.update(
-		// firstTab.id,
-		// {
-			// "url": newURLToPin // GDB TODO - should we make it explicitly not focused/active here?
-		// }
-	// );
-// }
+
 
 
 
