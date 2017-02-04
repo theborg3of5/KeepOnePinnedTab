@@ -52,15 +52,27 @@ function updateAllWindows() {
 		},
 		function(windows){
 			for(var i = 0; i < windows.length; i++)
-				keepSpecialTabs(windows[i]);
+				keepSpecialTabs(windows[i].id);
 		}
 	);
 }
 
 
-function keepSpecialTabs(targetWindow) {
-	keepPinnedTab(targetWindow);
-	keepAdditionalTab(targetWindow);
+function keepSpecialTabs(targetWindowId) {
+	if(!targetWindowId)
+		return;
+	
+	chrome.windows.get(
+		targetWindowId,
+		{
+			"populate":    true,
+			"windowTypes": ["normal"]
+		},
+		function(targetWindow) {
+			keepPinnedTab(targetWindow);
+			keepAdditionalTab(targetWindow);
+		}
+	);
 }
 
 
@@ -73,7 +85,6 @@ function keepPinnedTab(targetWindow) {
 	if(needPinnedTab(targetWindow))
 		createPinnedTab(targetWindow);
 }
-
 function needPinnedTab(targetWindow) {
 	if(targetWindow == undefined)
 		return false;
@@ -83,8 +94,10 @@ function needPinnedTab(targetWindow) {
 	
 	return true;
 }
-
 function isOurTab(tab) {
+	if(!tab)
+		return false;
+	
 	if(!tab.pinned)
 		return false;
 	
@@ -93,7 +106,6 @@ function isOurTab(tab) {
 	
 	return true;
 }
-
 function createPinnedTab(targetWindow) {
 	// Spawn our special tab. Stick it at the beginning and pin it, but don't focus it.
 	chrome.tabs.create(
@@ -115,14 +127,12 @@ function keepAdditionalTab(targetWindow) {
 	if(needAdditionalTab(targetWindow))
 		createAdditionalTab(targetWindow);
 }
-
 function needAdditionalTab(targetWindow) {
 	if(targetWindow.tabs.length > 1)
 		return false;
 	
 	return true;
 }
-
 function createAdditionalTab(targetWindow) {
 	chrome.tabs.create(
 		{
@@ -130,6 +140,75 @@ function createAdditionalTab(targetWindow) {
 		}
 	);
 }
+
+var nextCreateTabTriggersKeep = false;
+
+function windowCreated(newWindow) {
+	// console.log("windowCreated");
+	
+	nextCreateTabTriggersKeep = true;
+}
+
+function tabRemoved(tabId, removeInfo) {
+	// console.log("tabRemoved");
+	
+	if(removeInfo.isWindowClosing)
+		return;
+	
+	keepSpecialTabs(removeInfo.windowId);
+}
+
+function tabDetached(tabId, detachInfo) {
+	// console.log("tabDetached");
+	
+	// If we just detached a tab, and the only thing left is our pinned tab, just close that window.
+	chrome.windows.get(
+		detachInfo.oldWindowId,
+		{
+			"populate": true
+		},
+		closeWindowOnDetach
+	);
+}
+
+function closeWindowOnDetach(detachedWindow) {
+	if(!detachedWindow)
+		return;
+	
+	if(detachedWindow.tabs.length != 1)
+		return;
+		
+	if(!isOurTab(detachedWindow.tabs[0]))
+		return;
+	
+	chrome.windows.remove(detachedWindow.id);
+}
+
+function tabCreated(tab) {
+	// console.log("tabCreated");
+	
+	if(nextCreateTabTriggersKeep) {
+		nextCreateTabTriggersKeep = false;
+		keepSpecialTabs(tab.windowId);
+	}
+}
+
+
+startup();
+
+
+chrome.windows.onCreated.addListener(windowCreated);
+chrome.tabs.onRemoved.addListener(tabRemoved);
+chrome.tabs.onCreated.addListener(tabCreated);
+chrome.tabs.onDetached.addListener(tabDetached);
+
+// chrome.storage.onChanged.addListener(updateOptions);
+// chrome.tabs.onActivated.addListener(tabActivated); // GDB TODO - implement to have setting, so that the tab in question shoves focus away from itself.
+
+
+
+
+
 
 
 
@@ -195,37 +274,3 @@ function createAdditionalTab(targetWindow) {
 				// }
 			// });
 	// }
-
-
-function windowCreated(newWindow) {
-	chrome.windows.get(newWindow.id, {"populate": true}, keepSpecialTabs);
-}
-	
-// GDB TODO - get the window from the tab that was removed
-function tabRemoved(tabId, removeInfo) {
-	if(removeInfo.isWindowClosing)
-		return;
-	
-	chrome.windows.getLastFocused(
-		{
-			"populate":    true,
-			"windowTypes": ["normal"]
-		},
-		function(focusedWindow){
-			keepSpecialTabs(focusedWindow);
-		}
-	);
-}
-	
-	
-
-
-
-startup();
-
-// chrome.storage.onChanged.addListener(updateOptions);
-
-chrome.windows.onCreated.addListener(windowCreated);
-chrome.tabs.onRemoved.addListener(tabRemoved);
-
-// chrome.tabs.onActivated.addListener(tabActivated); // GDB TODO - implement to have setting, so that the tab in question shoves focus away from itself.
