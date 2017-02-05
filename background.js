@@ -79,7 +79,6 @@ function keepPinnedTab(targetWindow) {
 function needPinnedTab(targetWindow) {
 	if(targetWindow == undefined)
 		return false;
-	
 	if(isOurTab(targetWindow.tabs[0])) // Our desired tab already exists.
 		return false; 
 	
@@ -88,10 +87,8 @@ function needPinnedTab(targetWindow) {
 function isOurTab(tab, urlToCheck = pinnedTabURL) {
 	if(!tab)
 		return false;
-	
 	if(!tab.pinned)
 		return false;
-	
 	if(tab.url.indexOf(urlToCheck) == -1)
 		return false;
 	
@@ -136,11 +133,50 @@ function windowCreated(newWindow) {
 	nextCreateTabTriggersKeep = true;
 }
 
-function tabRemoved(tabId, removeInfo) {
-	if(removeInfo.isWindowClosing)
+var noFocusPinnedTab = true; // GDB TODO - trun this into a setting.
+function tabActivated(activeInfo) {
+	if(noFocusPinnedTab)
+		chrome.windows.get(
+			activeInfo.windowId,
+			{
+				"populate":    true,
+				"windowTypes": ["normal"]
+			},
+			function(targetWindow) {
+				if(ourTabIsFocused(targetWindow))
+					unfocusPinnedTab(targetWindow);
+			}
+		);
+}
+function ourTabIsFocused(targetWindow) {
+	var firstTab = targetWindow.tabs[0];
+	
+	if(!targetWindow)
+		return false;
+	if(!isOurTab(firstTab))
+		return false;
+	if(!firstTab.active)
+		return false;
+	
+	return true;
+}
+function unfocusPinnedTab(targetWindow) {
+	if(targetWindow.tabs.length < 2)
 		return;
 	
-	keepSpecialTabs(removeInfo.windowId);
+	chrome.tabs.update(
+		targetWindow.tabs[1].id,
+		{
+			active: true
+		}
+	);
+}
+
+function tabCreated(tab) {
+	if(nextCreateTabTriggersKeep) {
+		nextCreateTabTriggersKeep = false;
+		keepSpecialTabs(tab.windowId);
+	}
 }
 
 function tabDetached(tabId, detachInfo) {
@@ -155,21 +191,19 @@ function tabDetached(tabId, detachInfo) {
 function closeWindowOnDetachLastRealTab(detachedWindow) {
 	if(!detachedWindow)
 		return;
-	
 	if(detachedWindow.tabs.length != 1)
 		return;
-		
 	if(!isOurTab(detachedWindow.tabs[0]))
 		return;
 	
 	chrome.windows.remove(detachedWindow.id);
 }
 
-function tabCreated(tab) {
-	if(nextCreateTabTriggersKeep) {
-		nextCreateTabTriggersKeep = false;
-		keepSpecialTabs(tab.windowId);
-	}
+function tabRemoved(tabId, removeInfo) {
+	if(removeInfo.isWindowClosing)
+		return;
+	
+	keepSpecialTabs(removeInfo.windowId);
 }
 
 function storageChanged() {
@@ -223,38 +257,8 @@ startup();
 
 
 chrome.windows.onCreated.addListener(windowCreated);
-
-// chrome.tabs.onActivated.addListener(tabActivated); // GDB TODO - implement to have setting, so that the tab in question shoves focus away from itself.
+chrome.tabs.onActivated.addListener(tabActivated);
 chrome.tabs.onCreated.addListener(tabCreated);
 chrome.tabs.onDetached.addListener(tabDetached);
 chrome.tabs.onRemoved.addListener(tabRemoved);
-
 chrome.storage.onChanged.addListener(storageChanged);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// function tabActivated(activeInfo)
-	// {
-	// if(typeof activeInfo.windowId != 'undefined') chrome.windows.get(activeInfo.windowId, { "populate": true },
-		// function (window)
-			// {
-			// if(window.tabs[0].active == true)
-				// {
-				// if(newTab == true) chrome.tabs.create({"windowId": window.id, "url": "chrome://newtab", "active": true});
-				// else chrome.tabs.update(window.tabs[1].id, {active: true});
-				// }
-			// });
-	// }
