@@ -12,12 +12,11 @@ function saveOptions() {
 		{
 			[KOPT_NoFocusTab]: noFocusPinnedTab,
 			[KOPT_Page]:       pinnedTabPage,
-			[KOPT_CustomURL]:  customURL,
-			[KOPT_LegacyKey]:  "" // Old style, clear it out when we save. Should have fixed it to new style in actual elements via loadOptions().
+			[KOPT_CustomURL]:  customURL
 		}
 	);
 	
-	// Update status to let user know options were saved.
+	// Flash a message at the user that settings were saved.
 	var status = document.getElementById("status");
 	status.innerHTML = "Options Saved.";
 	setTimeout(
@@ -35,7 +34,6 @@ function loadOptions() {
 			KOPT_NoFocusTab,
 			KOPT_Page,
 			KOPT_CustomURL,
-			KOPT_LegacyKey // Old
 		],
 		function(items) {
 			var noFocusPinnedTab = items[KOPT_NoFocusTab]
@@ -43,13 +41,6 @@ function loadOptions() {
 			var customURL        = items[KOPT_CustomURL];
 			
 			document.getElementById("NoFocusPinnedTab").checked = noFocusPinnedTab;
-			
-			// Old style of storage (remove eventually)
-			var oldStyleURL = items[KOPT_LegacyKey];
-			if(oldStyleURL) {
-				pinnedTabPage = PinnedTabPage_Custom;
-				customURL = oldStyleURL;
-			}
 			
 			// Default
 			if(!pinnedTabPage)

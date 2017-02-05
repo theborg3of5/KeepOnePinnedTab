@@ -1,6 +1,7 @@
-﻿var PinnedTabURL           = "";
-var NoFocusPinnedTab       = false;
-var NextCreateTriggersKeep = false;
+﻿var NoFocusPinnedTab        = false;
+var PinnedTabURL            = "";
+var NextCreateTriggersKeep  = false;
+var JustFixedLegacySettings = false;
 
 
 function startup() {
@@ -12,37 +13,46 @@ function startup() {
 			KOPT_LegacyKey // Old
 		],
 		function(items) {
-			updateSettingsFromStorage(items);
-			
-			chrome.windows.getAll(
-				{
-					"populate":    true, 
-					"windowTypes": ["normal"]
-				},
-				function(windows){
-					for(var i = 0; i < windows.length; i++)
-						keepSpecialTabs(windows[i].id);
+			// Deal with legacy settings // Old
+			if(!JustFixedLegacySettings)
+				if(haveLegacySettings(items)) {
+					fixLegacySettings(items);
+					return;
 				}
-			);
+			
+			updateSettings(items);
+			updateAllWindows();
 		}
-	);	
+	);
 }
 
-function updateSettingsFromStorage(items) {
-	PinnedTabURL = getPinnedURLFromStorage(items);
+function haveLegacySettings(items) {
+	if(items[KOPT_LegacyKey])
+		return true;
+	
+	return false;
+}
+function fixLegacySettings(items) {
+	chrome.storage.sync.set(
+		{
+			[KOPT_Page]:       PinnedTabPage_Custom,
+			[KOPT_CustomURL]:  items[KOPT_LegacyKey],
+			[KOPT_LegacyKey]:  "" // Old style, clear it out when we save. Should have fixed it to new style in actual elements via loadOptions().
+		},
+		function() {
+			JustFixedLegacySettings = true; // Shouldn't be needed, but just in case.
+			startup(); // Start over with updated settings.
+		}
+	);
+}
+
+function updateSettings(items) {
+	PinnedTabURL = getPinnedURL(items);
 	NoFocusPinnedTab = items[KOPT_NoFocusTab];
 }
-function getPinnedURLFromStorage(items) {
+function getPinnedURL(items) {
 	var pageToPin = items[KOPT_Page];
 	
-	// Old style of storage (remove eventually)
-	var oldStyleURL = items[KOPT_LegacyKey];
-	if( (oldStyleURL != undefined) && (oldStyleURL != "") )
-		return oldStyleURL;
-	
-	return getURLFromPage(pageToPin);
-}
-function getURLFromPage(pageToPin) {
 	if(pageToPin == PinnedTabPage_Default)
 		return PinnedTabURL_Default;
 	if(pageToPin == PinnedTabPage_BlankLight)
@@ -53,6 +63,19 @@ function getURLFromPage(pageToPin) {
 		return items[KOPT_CustomURL];
 	
 	return PinnedTabURL_Default;
+}
+
+function updateAllWindows() {
+	chrome.windows.getAll(
+		{
+			"populate":    true,
+			"windowTypes": ["normal"]
+		},
+		function(windows){
+			for(var i = 0; i < windows.length; i++)
+				keepSpecialTabs(windows[i].id);
+		}
+	);
 }
 
 function keepSpecialTabs(targetWindowId) {
@@ -221,7 +244,7 @@ function storageChanged() {
 		function(items) {
 			var oldPinnedURL = PinnedTabURL;
 			
-			updateSettingsFromStorage(items);
+			updateSettings(items);
 			
 			if(oldPinnedURL == PinnedTabURL)
 				return;
