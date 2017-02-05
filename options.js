@@ -42,20 +42,35 @@ function loadOptions() {
 			
 			document.getElementById("NoFocusPinnedTab").checked = noFocusPinnedTab;
 			
-			// Default
-			if(!pinnedTabPage)
+			if(!pinnedTabPage) // Default if not set
 				pinnedTabPage = PinnedTabPage_Default;
-			
-			var optionElement = document.querySelector("input[name=PinnedTabPage][value=" + pinnedTabPage + "]");
+			var optionElement = document.querySelector(".PinnedTabPage[value=" + pinnedTabPage + "]");
 			if(optionElement)
 				optionElement.checked = true;
 			
 			if(pinnedTabPage == PinnedTabPage_Custom)
 				document.getElementById("customURL").value = customURL;
+			
+			updateCustomWarning(pinnedTabPage);
 		}
 	);
+}
+
+function updateCustomWarningEvent(e) {
+	updateCustomWarning(e.target.value);
+}
+function updateCustomWarning(pinnedTabPage) {
+	if(pinnedTabPage == PinnedTabPage_Custom)
+		document.getElementById("customWarning").style.display = "inline";
+	else
+		document.getElementById("customWarning").style.display = "none";
 }
 
 // Add the events to load/save from this page.
 document.addEventListener("DOMContentLoaded", loadOptions);
 document.querySelector("#save").addEventListener("click", saveOptions);
+
+// Update whether custom warning is shown when different page options are selected.
+var pinnedTabPageInputs = document.querySelectorAll(".PinnedTabPage")
+for(var i = 0; i < pinnedTabPageInputs.length; i++)
+	pinnedTabPageInputs[i].addEventListener("change", updateCustomWarningEvent);
