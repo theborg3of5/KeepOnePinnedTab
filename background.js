@@ -1,4 +1,5 @@
 ﻿var pinnedTabURL = "";
+var noFocusPinnedTab = false;
 var nextCreateTabTriggersKeep = false;
 
 
@@ -6,12 +7,14 @@ var nextCreateTabTriggersKeep = false;
 function startup() {
 	chrome.storage.sync.get(
 		[
+			KOPT_NoFocusTab,
 			KOPT_Page,
 			KOPT_CustomURL,
 			KOPT_LegacyKey // Old
 		],
 		function(items) {
 			pinnedTabURL = getPinnedURLFromStorage(items);
+			noFocusPinnedTab = items[KOPT_NoFocusTab];
 			
 			chrome.windows.getAll(
 				{
@@ -133,7 +136,6 @@ function windowCreated(newWindow) {
 	nextCreateTabTriggersKeep = true;
 }
 
-var noFocusPinnedTab = true; // GDB TODO - trun this into a setting.
 function tabActivated(activeInfo) {
 	if(noFocusPinnedTab)
 		chrome.windows.get(

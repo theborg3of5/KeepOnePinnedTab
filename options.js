@@ -2,15 +2,18 @@
 function saveOptions() {
 	var customURL;
 	
+	var noFocusPinnedTab = document.getElementById("NoFocusPinnedTab").checked;
+	
 	var pinnedTabPage = document.querySelector("input[name=PinnedTabPage]:checked").value;
 	if(pinnedTabPage == PinnedTabPage_Custom)
 		customURL = document.querySelector("#customURL").value;
 	
 	chrome.storage.sync.set(
 		{
-			[KOPT_Page]:      pinnedTabPage,
-			[KOPT_CustomURL]: customURL,
-			[KOPT_LegacyKey]: "" // Old style, clear it out when we save. Should have fixed it to new style in actual elements via loadOptions().
+			[KOPT_NoFocusTab]: noFocusPinnedTab,
+			[KOPT_Page]:       pinnedTabPage,
+			[KOPT_CustomURL]:  customURL,
+			[KOPT_LegacyKey]:  "" // Old style, clear it out when we save. Should have fixed it to new style in actual elements via loadOptions().
 		}
 	);
 	
@@ -28,23 +31,27 @@ function saveOptions() {
 function loadOptions() {
 	chrome.storage.sync.get(
 		[
+			KOPT_NoFocusTab,
 			KOPT_Page,
 			KOPT_CustomURL,
 			KOPT_LegacyKey // Old
 		],
 		function(items) {
-			var pinnedTabPage = items[KOPT_Page];
-			var customURL     = items[KOPT_CustomURL];
+			var noFocusPinnedTab = items[KOPT_NoFocusTab]
+			var pinnedTabPage    = items[KOPT_Page];
+			var customURL        = items[KOPT_CustomURL];
+			
+			document.getElementById("NoFocusPinnedTab").checked = noFocusPinnedTab;
 			
 			// Old style of storage (remove eventually)
 			var oldStyleURL = items[KOPT_LegacyKey];
-			if((oldStyleURL != undefined) && (oldStyleURL != "")) {
+			if(oldStyleURL) {
 				pinnedTabPage = PinnedTabPage_Custom;
 				customURL = oldStyleURL;
 			}
 			
 			// Default
-			if( (pinnedTabPage == undefined) || (pinnedTabPage == "") )
+			if(!pinnedTabPage)
 				pinnedTabPage = PinnedTabPage_Default;
 			
 			var optionElement = document.querySelector("input[name=PinnedTabPage][value=" + pinnedTabPage + "]");
