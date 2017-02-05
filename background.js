@@ -1,7 +1,6 @@
-﻿var pinnedTabURL = "";
-var noFocusPinnedTab = false;
-var nextCreateTabTriggersKeep = false;
-
+﻿var PinnedTabURL           = "";
+var NoFocusPinnedTab       = false;
+var NextCreateTriggersKeep = false;
 
 
 function startup() {
@@ -13,8 +12,7 @@ function startup() {
 			KOPT_LegacyKey // Old
 		],
 		function(items) {
-			pinnedTabURL = getPinnedURLFromStorage(items);
-			noFocusPinnedTab = items[KOPT_NoFocusTab];
+			updateSettingsFromStorage(items);
 			
 			chrome.windows.getAll(
 				{
@@ -30,6 +28,10 @@ function startup() {
 	);	
 }
 
+function updateSettingsFromStorage(items) {
+	PinnedTabURL = getPinnedURLFromStorage(items);
+	NoFocusPinnedTab = items[KOPT_NoFocusTab];
+}
 function getPinnedURLFromStorage(items) {
 	var pageToPin = items[KOPT_Page];
 	
@@ -71,7 +73,7 @@ function keepSpecialTabs(targetWindowId) {
 }
 
 function keepPinnedTab(targetWindow) {
-	if(pinnedTabURL == "")
+	if(PinnedTabURL == "")
 		return;
 	if(targetWindow.type != "normal")
 		return;
@@ -87,7 +89,7 @@ function needPinnedTab(targetWindow) {
 	
 	return true;
 }
-function isOurTab(tab, urlToCheck = pinnedTabURL) {
+function isOurTab(tab, urlToCheck = PinnedTabURL) {
 	if(!tab)
 		return false;
 	if(!tab.pinned)
@@ -102,7 +104,7 @@ function createPinnedTab(targetWindow) {
 	chrome.tabs.create(
 		{
 			"windowId": targetWindow.id,
-			"url":      pinnedTabURL,
+			"url":      PinnedTabURL,
 			"index":    0,
 			"pinned":   true,
 			"active":   false
@@ -133,11 +135,11 @@ function createAdditionalTab(targetWindow) {
 
 
 function windowCreated(newWindow) {
-	nextCreateTabTriggersKeep = true;
+	NextCreateTriggersKeep = true;
 }
 
 function tabActivated(activeInfo) {
-	if(noFocusPinnedTab)
+	if(NoFocusPinnedTab)
 		chrome.windows.get(
 			activeInfo.windowId,
 			{
@@ -175,8 +177,8 @@ function unfocusPinnedTab(targetWindow) {
 }
 
 function tabCreated(tab) {
-	if(nextCreateTabTriggersKeep) {
-		nextCreateTabTriggersKeep = false;
+	if(NextCreateTriggersKeep) {
+		NextCreateTriggersKeep = false;
 		keepSpecialTabs(tab.windowId);
 	}
 }
@@ -211,18 +213,20 @@ function tabRemoved(tabId, removeInfo) {
 function storageChanged() {
 	chrome.storage.sync.get(
 		[
+			KOPT_NoFocusTab,
 			KOPT_Page,
 			KOPT_CustomURL,
 			KOPT_LegacyKey // Old
 		],
 		function(items) {
-			var oldPinnedURL = pinnedTabURL;
-			pinnedTabURL = getPinnedURLFromStorage(items);
+			var oldPinnedURL = PinnedTabURL;
 			
-			if(oldPinnedURL == pinnedTabURL)
+			updateSettingsFromStorage(items);
+			
+			if(oldPinnedURL == PinnedTabURL)
 				return;
 			
-			convertAllWindows(oldPinnedURL, pinnedTabURL);
+			convertAllWindows(oldPinnedURL, PinnedTabURL);
 		}
 	);
 }
@@ -253,9 +257,7 @@ function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
 }
 
 
-
 startup();
-
 
 
 chrome.windows.onCreated.addListener(windowCreated);
