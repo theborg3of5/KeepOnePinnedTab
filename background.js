@@ -132,11 +132,12 @@ function createPinnedTab(targetWindow) {
 			"pinned":   true,
 			"active":   false
 		},
-		function(tab) {
-			if(!tab) // Most likely, the window doesn't exist anymore (because last tab was closed).
-				var lastError = chrome.runtime.lastError; // check lastError so Chrome doesn't output anything to the console.
-		}
+		catchTabCreateError
 	);
+}
+function catchTabCreateError(tab) {
+	if(!tab) // Most likely, the window doesn't exist anymore (because last tab was closed).
+		var lastError = chrome.runtime.lastError; // check lastError so Chrome doesn't output anything to the console.
 }
 
 function keepAdditionalTab(targetWindow) {
@@ -155,8 +156,10 @@ function needAdditionalTab(targetWindow) {
 function createAdditionalTab(targetWindow) {
 	chrome.tabs.create(
 		{
-			"active": true
-		}
+			"windowId": targetWindow.id,
+			"active":   true
+		},
+		catchTabCreateError
 	);
 }
 
