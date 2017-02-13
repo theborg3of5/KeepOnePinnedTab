@@ -131,6 +131,10 @@ function createPinnedTab(targetWindow) {
 			"index":    0,
 			"pinned":   true,
 			"active":   false
+		},
+		function(tab) {
+			if(!tab) // Most likely, the window doesn't exist anymore (because last tab was closed).
+				var lastError = chrome.runtime.lastError; // check lastError so Chrome doesn't output anything to the console.
 		}
 	);
 }
