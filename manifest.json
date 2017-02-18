@@ -13,5 +13,5 @@
 	"background": {
 		"page": "background.html"
 	},
-  "options_page": "options.html"
+	"options_page": "options.html"
 }
