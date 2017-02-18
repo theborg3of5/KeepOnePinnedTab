@@ -1,4 +1,4 @@
-﻿// Saves options to chrome sync storage.
+﻿
 function saveOptions() {
 	var customURL;
 	
@@ -16,7 +16,6 @@ function saveOptions() {
 		}
 	);
 	
-	// Flash a message at the user that settings were saved.
 	var status = document.getElementById("status");
 	status.innerHTML = "Options Saved.";
 	setTimeout(
@@ -26,8 +25,6 @@ function saveOptions() {
 		750
 	);
 }
-
-// Restores select box state to saved value from chrome sync storage.
 function loadOptions() {
 	chrome.storage.sync.get(
 		[
@@ -65,6 +62,7 @@ function updateCustomWarning(pinnedTabPage) {
 	else
 		document.getElementById("customWarning").style.display = "none";
 }
+
 
 // Add the events to load/save from this page.
 document.addEventListener("DOMContentLoaded", loadOptions);

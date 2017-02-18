@@ -1,4 +1,5 @@
-﻿var NoFocusPinnedTab        = false;
+﻿
+var NoFocusPinnedTab        = false;
 var PinnedTabURL            = "";
 var NextCreateTriggersKeep  = false;
 var JustFixedLegacySettings = false;
@@ -123,7 +124,6 @@ function isOurTab(tab, urlToCheck = PinnedTabURL) {
 	return true;
 }
 function createPinnedTab(targetWindow) {
-	// Spawn our special tab. Stick it at the beginning and pin it, but don't focus it.
 	chrome.tabs.create(
 		{
 			"windowId": targetWindow.id,
