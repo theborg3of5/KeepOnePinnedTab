@@ -2,10 +2,17 @@
 	<head>
 		<title>Keep One Pinned Tab: Options</title>
 		<script type='text/javascript' src='constants.js'></script>
+		<style>
+			input[type="radio"],
+			input[type="checkbox"] {
+				margin-top: -1px;
+				vertical-align: middle;
+			}
+		</style>
 	</head>
 
 	<body>
-		<p>Please choose the URL for the page that you would like to keep pinned at all times:</p>
+		<p style="margin-bottom: 5px; font-weight: 600;">Page to keep pinned at all times:</p>
 		
 		<label>
 			<input type="radio" class="PinnedTabPage" name="PinnedTabPage" value="Default" /> Default
@@ -28,7 +35,7 @@
 		<span id="customWarning">Make sure that this URL is the same as what appears in Chrome's URL bar (copy/paste is best).</span>
 		
 		<br /><br />
-		<label>
+		<label title="If this is checked and you try to focus the special pinned tab, we will immediately switch to the next tab instead.">
 			<input id="NoFocusPinnedTab" type="checkbox" /> Never focus pinned tab
 		</label>
 		
