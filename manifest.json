@@ -13,5 +13,6 @@
 	"background": {
 		"page": "background.html"
 	},
+	"incognito": "split",
 	"options_page": "options.html"
 }
