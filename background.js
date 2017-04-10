@@ -90,20 +90,24 @@ function keepSpecialTabs(targetWindowId) {
 			"windowTypes": ["normal"]
 		},
 		function(targetWindow) {
-			keepPinnedTab(targetWindow);
-			keepAdditionalTab(targetWindow);
+			if(!keepPinnedTab(targetWindow)) // Only check for the additional tab if we didn't just create a pinned one.
+				keepAdditionalTab(targetWindow);
 		}
 	);
 }
 
 function keepPinnedTab(targetWindow) {
 	if(PinnedTabURL == "")
-		return;
+		return false;
 	if(targetWindow.type != "normal")
-		return;
+		return false;
 	
-	if(needPinnedTab(targetWindow))
+	if(needPinnedTab(targetWindow)) {
 		createPinnedTab(targetWindow);
+		return true; // Created a new pinned tab
+	}
+	
+	return false;
 }
 function needPinnedTab(targetWindow) {
 	if(targetWindow == undefined)
