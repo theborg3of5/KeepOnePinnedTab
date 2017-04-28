@@ -1,30 +1,4 @@
 ﻿
-function saveOptions() {
-	var customURL;
-	
-	var noFocusPinnedTab = document.getElementById("NoFocusPinnedTab").checked;
-	
-	var pinnedTabPage = document.querySelector("input[name=PinnedTabPage]:checked").value;
-	if(pinnedTabPage == PinnedTabPage_Custom)
-		customURL = document.querySelector("#customURL").value;
-	
-	chrome.storage.sync.set(
-		{
-			[KOPT_NoFocusTab]: noFocusPinnedTab,
-			[KOPT_Page]:       pinnedTabPage,
-			[KOPT_CustomURL]:  customURL
-		}
-	);
-	
-	var status = document.getElementById("status");
-	status.innerHTML = "Options Saved.";
-	setTimeout(
-		function() {
-			status.innerHTML = "";
-		},
-		750
-	);
-}
 function loadOptions() {
 	chrome.storage.sync.get(
 		[
@@ -50,6 +24,33 @@ function loadOptions() {
 			
 			updateCustomWarning(pinnedTabPage);
 		}
+	);
+}
+
+function saveOptions() {
+	var customURL;
+	
+	var noFocusPinnedTab = document.getElementById("NoFocusPinnedTab").checked;
+	
+	var pinnedTabPage = document.querySelector("input[name=PinnedTabPage]:checked").value;
+	if(pinnedTabPage == PinnedTabPage_Custom)
+		customURL = document.querySelector("#customURL").value;
+	
+	chrome.storage.sync.set(
+		{
+			[KOPT_NoFocusTab]: noFocusPinnedTab,
+			[KOPT_Page]:       pinnedTabPage,
+			[KOPT_CustomURL]:  customURL
+		}
+	);
+	
+	var status = document.getElementById("status");
+	status.innerHTML = "Options Saved.";
+	setTimeout(
+		function() {
+			status.innerHTML = "";
+		},
+		750
 	);
 }
 
