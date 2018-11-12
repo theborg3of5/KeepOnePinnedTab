@@ -2,3 +2,4 @@ Make tab filter a little less granular?
 	Already just checks the beginning (I think)
 	Make http vs https not matter?
 		Might need a setting in this case, though - maybe an "exact match" checkbox?
+Consider new setting for ignoring all pinned tabs in counting - so "keep one non-pinned tab open".
