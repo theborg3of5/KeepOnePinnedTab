@@ -122,7 +122,7 @@ function isOurTab(tab, urlToCheck = PinnedTabURL) {
 		return false;
 	if(!tab.pinned)
 		return false;
-	if(tab.url.indexOf(urlToCheck) == -1)
+	if((tab.url.indexOf(urlToCheck) === -1) && (tab.pendingUrl.indexOf(urlToCheck) === -1))
 		return false;
 	
 	return true;
