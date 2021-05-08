@@ -1,3 +1,12 @@
+Consider ignoring tabs in collapsed groups when counting how many tabs besides our special pinned one there are
+	Goal: similar behavior with collapsed tab group, as when those tabs don't exist
+	This will require the "tabGroups" permission > requires me to move to manifest v3 > requires switching from a background page to a service worker
+	Code bits
+		Tab.groupId - ID of group tab is in, or chrome.tabGroups.TAB_GROUP_ID_NONE (-1) if it's not in a group
+		var groupId = targetWindow.tabs[1].groupId;
+		var group = chrome.tabGroups.get(groupId);
+		console.log(group.collapsed);
+Clean out "legacy" handling for old settings key
 Make tab filter a little less granular?
 	Already just checks the beginning (I think)
 	Make http vs https not matter?
