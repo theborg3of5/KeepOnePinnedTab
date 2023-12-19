@@ -1,14 +1,14 @@
 ﻿// #region Constants
 // Options for which sort of pinned tab we keep.
-var PinnedTabPage_Default    = "Default";
-var PinnedTabPage_BlankLight = "BlankLight";
-var PinnedTabPage_BlankDark  = "BlankDark";
-var PinnedTabPage_Custom     = "Custom";
+const PinnedTabPage_Default    = "Default";
+const PinnedTabPage_BlankLight = "BlankLight";
+const PinnedTabPage_BlankDark  = "BlankDark";
+const PinnedTabPage_Custom     = "Custom";
 
 // Keys that we use to index into the sync storage.
-var KOPT_NoFocusTab = "KeepOnePinnedTab_NoFocusPinnedTab";
-var KOPT_Page       = "KeepOnePinnedTab_PinnedTabPage";
-var KOPT_CustomURL  = "KeepOnePinnedTab_CustomPinnedTabURL";
+const KOPT_NoFocusTab = "KeepOnePinnedTab_NoFocusPinnedTab";
+const KOPT_Page       = "KeepOnePinnedTab_PinnedTabPage";
+const KOPT_CustomURL  = "KeepOnePinnedTab_CustomPinnedTabURL";
 // #endregion Constants
 
 // GDB TODO will need to get rid of these global variables, probably using chrome.storage.local instead (see https://developer.chrome.com/docs/extensions/develop/migrate/to-service-workers#persist-states)
@@ -65,61 +65,32 @@ async function shouldBlockPinnedTabFocus()
  * @returns Promise that resolves into the URL we should use for our pinned tab.
  */
 async function getPinnedURL() {
-	return new Promise(
-		(resolve) =>
-		{
-			chrome.storage.sync.get([KOPT_Page, KOPT_CustomURL],
-				(settings) =>
-				{
-					let url = "";
-					switch (settings[KOPT_Page])
-					{
-						case PinnedTabPage_BlankLight:
-							url = chrome.runtime.getURL("Resources/blankLight.html");
-						case PinnedTabPage_BlankDark:
-							url = chrome.runtime.getURL("Resources/blankDark.html");
-						case PinnedTabPage_Custom:
-							url = settings[KOPT_CustomURL];
-						case PinnedTabPage_Default:
-						default:
-							url = "chrome://newtab/";
-					}
-
-					resolve(url);
+	return new Promise((resolve, reject) =>	{
+		chrome.storage.sync.get([KOPT_Page, KOPT_CustomURL],
+			(settings) => {
+				if (settings[KOPT_Page] == undefined) {
+					reject();
+					return;
 				}
-			)
-		}
-	);
-}
 
-/**
- * Figure out what the pinned tab URL should be based on the give sync settings.
- * @param {object} settings Sync storage object with the KOPT_Page and KOPT_CustomURL items on it.
- * @returns The URL to use for our pinned tab.
- */
-function calculatePinnedURL(settings) {
-	switch (settings[KOPT_Page])
-	{
-		case PinnedTabPage_BlankLight:
-			return chrome.runtime.getURL("Resources/blankLight.html");
-		case PinnedTabPage_BlankDark:
-			return chrome.runtime.getURL("Resources/blankDark.html");
-		case PinnedTabPage_Custom:
-			return settings[KOPT_CustomURL];
-		case PinnedTabPage_Default:
-		default:
-			return "chrome://newtab/";
-	}
-}
+				let url = "";
+				switch (settings[KOPT_Page])
+				{
+					case PinnedTabPage_BlankLight:
+						url = chrome.runtime.getURL("Resources/blankLight.html");
+					case PinnedTabPage_BlankDark:
+						url = chrome.runtime.getURL("Resources/blankDark.html");
+					case PinnedTabPage_Custom:
+						url = settings[KOPT_CustomURL];
+					case PinnedTabPage_Default:
+					default:
+						url = "chrome://newtab/";
+				}
 
-async function getSyncValue(key)
-{
-	return new Promise(
-		(resolve, reject) =>
-		{
-			chrome.storage.sync.get([key])
-		}
-	);
+				resolve(url);
+			}
+		)
+	});
 }
 
 function updateAllWindows() {
@@ -145,7 +116,8 @@ function keepSpecialTabs(targetWindowId) {
 			"populate":    true,
 			"windowTypes": ["normal"]
 		},
-		async function(targetWindow) {
+		async (targetWindow) => 
+		{
 			if(!await tryKeepPinnedTab(targetWindow)) // Only check for the additional tab if we didn't just create a pinned one. // GDB TODO but why?
 				keepAdditionalTab(targetWindow);
 		}
@@ -203,7 +175,8 @@ function catchTabCreateError(tab) { // GDB todo is there a better way to do this
 		var lastError = chrome.runtime.lastError; // check lastError so Chrome doesn't output anything to the console.
 }
 
-function keepAdditionalTab(targetWindow) {
+function keepAdditionalTab(targetWindow)
+{
 	if(targetWindow.type != "normal")
 		return;
 	
