@@ -21,6 +21,7 @@ chrome.tabs.onActivated.addListener(tabActivated);
 chrome.tabs.onCreated.addListener(tabCreated);
 chrome.tabs.onDetached.addListener(tabDetached);
 chrome.tabs.onRemoved.addListener(tabRemoved);
+// chrome.tabs.onMoved.addListener(tempMoved); // GDB TEMP
 chrome.storage.onChanged.addListener(storageChanged);
 // #endregion Event Listeners
 
@@ -40,6 +41,18 @@ updateAllWindows();
 		"keep special tabs" - check if we have both the pinned tab and 1 "additional" (anything else) tab, and add what's missing if not.
 			There's some weird logic/assumptions going on in here, too.
 */
+
+// async function tempMoved(tabId, moveInfo) // GDB REMOVE
+// { 
+// 	chrome.tabs.create(
+// 		{
+// 			"windowId": moveInfo.windowId,
+// 			"url":      await getPinnedURL(),
+// 			"active":   false,
+// 		},
+// 		catchTabCreateError
+// 	);
+// }
 
 /**
  * Determine whether we should prevent our special pinned tab from getting focus (based on the user's settings).
@@ -72,25 +85,30 @@ async function getPinnedURL() {
 					reject();
 					return;
 				}
-
-				let url = "";
-				switch (settings[KOPT_Page])
-				{
-					case PinnedTabPage_BlankLight:
-						url = chrome.runtime.getURL("Resources/blankLight.html");
-					case PinnedTabPage_BlankDark:
-						url = chrome.runtime.getURL("Resources/blankDark.html");
-					case PinnedTabPage_Custom:
-						url = settings[KOPT_CustomURL];
-					case PinnedTabPage_Default:
-					default:
-						url = "chrome://newtab/";
-				}
-
-				resolve(url);
+				resolve(calculatePinnedURL(settings));
 			}
 		)
 	});
+}
+
+/**
+ * Figure out what the pinned tab URL should be based on the give sync settings.
+ * @param {object} settings Sync storage object with the KOPT_Page and KOPT_CustomURL items on it.
+ * @returns The URL to use for our pinned tab.
+ */
+function calculatePinnedURL(settings) {
+	switch (settings[KOPT_Page])
+	{
+		case PinnedTabPage_BlankLight:
+			return chrome.runtime.getURL("Resources/blankLight.html");
+		case PinnedTabPage_BlankDark:
+			return chrome.runtime.getURL("Resources/blankDark.html");
+		case PinnedTabPage_Custom:
+			return settings[KOPT_CustomURL];
+		case PinnedTabPage_Default:
+		default:
+			return "chrome://newtab/";
+	}
 }
 
 function updateAllWindows() {
@@ -100,7 +118,7 @@ function updateAllWindows() {
 			"windowTypes": ["normal"]
 		},
 		function(windows){
-			for(var i = 0; i < windows.length; i++)
+			for(var i = 0; i < windows.length; i++) // GDB TODO seems like this would be better as a for each/for in (whichever it is) or even an array.foreach
 				keepSpecialTabs(windows[i].id);
 		}
 	);
@@ -116,8 +134,7 @@ function keepSpecialTabs(targetWindowId) {
 			"populate":    true,
 			"windowTypes": ["normal"]
 		},
-		async (targetWindow) => 
-		{
+		async (targetWindow) => {
 			if(!await tryKeepPinnedTab(targetWindow)) // Only check for the additional tab if we didn't just create a pinned one. // GDB TODO but why?
 				keepAdditionalTab(targetWindow);
 		}
