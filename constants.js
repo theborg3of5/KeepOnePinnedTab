@@ -6,8 +6,8 @@ var PinnedTabPage_Custom     = "Custom";
 
 // Actual URLs for the non-custom pinned tab options.
 var PinnedTabURL_Default    = "chrome://newtab/";
-var PinnedTabURL_BlankLight = chrome.extension.getURL("Resources/blankLight.html");
-var PinnedTabURL_BlankDark  = chrome.extension.getURL("Resources/blankDark.html");
+var PinnedTabURL_BlankLight = chrome.runtime.getURL("Resources/blankLight.html");
+var PinnedTabURL_BlankDark  = chrome.runtime.getURL("Resources/blankDark.html");
 
 // Keys that we use to index into the sync storage.
 var KOPT_NoFocusTab = "KeepOnePinnedTab_NoFocusPinnedTab";
