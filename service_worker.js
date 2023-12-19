@@ -81,10 +81,6 @@ async function getPinnedURL() {
 	return new Promise((resolve, reject) =>	{
 		chrome.storage.sync.get([KOPT_Page, KOPT_CustomURL],
 			(settings) => {
-				if (settings[KOPT_Page] == undefined) {
-					reject();
-					return;
-				}
 				resolve(calculatePinnedURL(settings));
 			}
 		)
