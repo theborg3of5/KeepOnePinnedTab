@@ -27,6 +27,21 @@ function loadOptions() {
 	);
 }
 
+function calculatePinnedURL(page, customURL) { // GDB TODO try to pull this from a central spot instead of copying it here
+	switch (page)
+	{
+		case PinnedTabPage_BlankLight:
+			return chrome.runtime.getURL("Resources/blankLight.html");
+		case PinnedTabPage_BlankDark:
+			return chrome.runtime.getURL("Resources/blankDark.html");
+		case PinnedTabPage_Custom:
+			return customURL;
+		case PinnedTabPage_Default:
+		default:
+			return "chrome://newtab/";
+	}
+}
+
 function saveOptions() {
 	var customURL;
 	
@@ -40,7 +55,8 @@ function saveOptions() {
 		{
 			[KOPT_NoFocusTab]: noFocusPinnedTab,
 			[KOPT_Page]:       pinnedTabPage,
-			[KOPT_CustomURL]:  customURL
+			[KOPT_CustomURL]: customURL,
+			[KOPT_PinnedURL]: calculatePinnedURL(pinnedTabPage, customURL) // GDB TODO probably switch to just having this value (though I'll need some sort of legacy conversion handling to switch over)
 		}
 	);
 	

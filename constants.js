@@ -13,3 +13,4 @@ var PinnedTabURL_BlankDark  = chrome.runtime.getURL("Resources/blankDark.html");
 var KOPT_NoFocusTab = "KeepOnePinnedTab_NoFocusPinnedTab";
 var KOPT_Page       = "KeepOnePinnedTab_PinnedTabPage";
 var KOPT_CustomURL  = "KeepOnePinnedTab_CustomPinnedTabURL";
+const KOPT_PinnedURL = "KeepOnePinnedTab_PinnedURL";

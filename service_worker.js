@@ -8,7 +8,8 @@ const PinnedTabPage_Custom     = "Custom";
 // Keys that we use to index into the sync storage.
 const KOPT_NoFocusTab = "KeepOnePinnedTab_NoFocusPinnedTab";
 const KOPT_Page       = "KeepOnePinnedTab_PinnedTabPage";
-const KOPT_CustomURL  = "KeepOnePinnedTab_CustomPinnedTabURL";
+const KOPT_CustomURL = "KeepOnePinnedTab_CustomPinnedTabURL";
+const KOPT_PinnedURL = "KeepOnePinnedTab_PinnedURL";
 // #endregion Constants
 
 // GDB TODO will need to get rid of these global variables, probably using chrome.storage.local instead (see https://developer.chrome.com/docs/extensions/develop/migrate/to-service-workers#persist-states)
@@ -21,7 +22,6 @@ chrome.tabs.onActivated.addListener(tabActivated);
 chrome.tabs.onCreated.addListener(tabCreated);
 chrome.tabs.onDetached.addListener(tabDetached);
 chrome.tabs.onRemoved.addListener(tabRemoved);
-// chrome.tabs.onMoved.addListener(tempMoved); // GDB TEMP
 chrome.storage.onChanged.addListener(storageChanged);
 // #endregion Event Listeners
 
@@ -40,19 +40,11 @@ updateAllWindows();
 			If they do, update that tab to use the new pinned URL
 		"keep special tabs" - check if we have both the pinned tab and 1 "additional" (anything else) tab, and add what's missing if not.
 			There's some weird logic/assumptions going on in here, too.
+	New:
+		Settings as async getter functions (that can be await'd)
+		On tab activate, creation, detach, close, on settings change - same as before (but cleaned up and documented)
+		"keep special tabs" - same basic idea, but clean up and document
 */
-
-// async function tempMoved(tabId, moveInfo) // GDB REMOVE
-// { 
-// 	chrome.tabs.create(
-// 		{
-// 			"windowId": moveInfo.windowId,
-// 			"url":      await getPinnedURL(),
-// 			"active":   false,
-// 		},
-// 		catchTabCreateError
-// 	);
-// }
 
 /**
  * Determine whether we should prevent our special pinned tab from getting focus (based on the user's settings).
@@ -321,37 +313,33 @@ function tabRemoved(_tabId, removeInfo) {
 /**
  * Fires when the local storage (where our settings are kept) change.
  * https://developer.chrome.com/docs/extensions/reference/api/storage#event-onChanged
+ * @param {object} changes Contains all changed keys with oldValue/newValue inside.
  */
-function storageChanged() {
-	chrome.storage.sync.get(
-		[
-			KOPT_NoFocusTab,
-			KOPT_Page,
-			KOPT_CustomURL,
-		],
-		function(items) {
-			// var oldPinnedURL = PinnedTabURL; // GDB TODO figure out how to keep track of old pinned URL without a global variable?
-			
-			// if(oldPinnedURL == PinnedTabURL)
-			// 	return;
-			
-			chrome.windows.getAll(
-				{
-					"populate":    true, 
-					"windowTypes": ["normal"]
-				},
-				function(windows){
-					for(var i = 0; i < windows.length; i++) {
-						convertWindow(windows[i], oldPinnedURL, newPinnedURL);
-					}
-				}
-			);
+function storageChanged(changes)
+{
+	// Only need to worry about updating things if something about the pinned tab URL changed.
+	if (!changes[KOPT_PinnedURL])
+		return;
+
+	const { oldValue, newValue } = changes[KOPT_PinnedURL]; // GDB TODO finish converting everything over (conversion and the like) to new simplified settings node
+	const oldPinnedURL = oldValue;
+	const newPinnedURL = newValue;
+
+	chrome.windows.getAll(
+		{
+			"populate":    true, 
+			"windowTypes": ["normal"]
+		},
+		function(windows){
+			for(var i = 0; i < windows.length; i++) {
+				convertWindow(windows[i], oldPinnedURL, newPinnedURL);
+			}
 		}
 	);
 }
 
 /**
- * 
+ * "Convert" a window over to a new pinned tab URL (replacing the old pinned tab with a new one).
  * @param {Window} targetWindow The window object to convert
  * @param {string} oldPinnedURL The URL that we were previously using for our special pinned tabs
  * @param {string} newPinnedURL The URL that we now want to use for our special pinned tabs
