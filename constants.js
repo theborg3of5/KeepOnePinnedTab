@@ -13,4 +13,3 @@ var PinnedTabURL_BlankDark  = chrome.extension.getURL("Resources/blankDark.html"
 var KOPT_NoFocusTab = "KeepOnePinnedTab_NoFocusPinnedTab";
 var KOPT_Page       = "KeepOnePinnedTab_PinnedTabPage";
 var KOPT_CustomURL  = "KeepOnePinnedTab_CustomPinnedTabURL";
-var KOPT_LegacyKey  = "KeepOnePinnedTab_NewTabPage"; // Legacy way of storing settings - should be removed after a bit.

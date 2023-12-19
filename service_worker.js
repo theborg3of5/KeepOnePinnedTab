@@ -1,8 +1,25 @@
-﻿
+﻿// #region Constants
+// Options for which sort of pinned tab we keep.
+var PinnedTabPage_Default    = "Default";
+var PinnedTabPage_BlankLight = "BlankLight";
+var PinnedTabPage_BlankDark  = "BlankDark";
+var PinnedTabPage_Custom     = "Custom";
+
+// Actual URLs for the non-custom pinned tab options.
+var PinnedTabURL_Default    = "chrome://newtab/";
+var PinnedTabURL_BlankLight = chrome.runtime.getURL("Resources/blankLight.html");
+var PinnedTabURL_BlankDark  = chrome.runtime.getURL("Resources/blankDark.html");
+
+// Keys that we use to index into the sync storage.
+var KOPT_NoFocusTab = "KeepOnePinnedTab_NoFocusPinnedTab";
+var KOPT_Page       = "KeepOnePinnedTab_PinnedTabPage";
+var KOPT_CustomURL  = "KeepOnePinnedTab_CustomPinnedTabURL";
+// #endregion Constants
+
+
 var NoFocusPinnedTab        = false;
 var PinnedTabURL            = "";
 var NextCreateTriggersKeep  = false;
-var JustFixedLegacySettings = false;
 
 
 function startup() {
@@ -11,38 +28,10 @@ function startup() {
 			KOPT_NoFocusTab,
 			KOPT_Page,
 			KOPT_CustomURL,
-			KOPT_LegacyKey // Old
 		],
 		function(items) {
-			// Deal with legacy settings // Old
-			if(!JustFixedLegacySettings)
-				if(haveLegacySettings(items)) {
-					fixLegacySettings(items);
-					return;
-				}
-			
 			updateSettings(items);
 			updateAllWindows();
-		}
-	);
-}
-
-function haveLegacySettings(items) {
-	if(items[KOPT_LegacyKey])
-		return true;
-	
-	return false;
-}
-function fixLegacySettings(items) {
-	chrome.storage.sync.set(
-		{
-			[KOPT_Page]:       PinnedTabPage_Custom,
-			[KOPT_CustomURL]:  items[KOPT_LegacyKey],
-			[KOPT_LegacyKey]:  "" // Old style, clear it out when we save. Should have fixed it to new style in actual elements via loadOptions().
-		},
-		function() {
-			JustFixedLegacySettings = true; // Shouldn't be needed, but just in case.
-			startup(); // Start over with updated settings.
 		}
 	);
 }
@@ -167,11 +156,20 @@ function createAdditionalTab(targetWindow) {
 	);
 }
 
-
+/**
+ * GDBTODO
+ * https://developer.chrome.com/docs/extensions/reference/api/windows#event-onCreated
+ * @param {gdbtodo} newWindow gdbtodo
+ */
 function windowCreated(newWindow) {
 	NextCreateTriggersKeep = true;
 }
 
+/**
+ * gdbtodo
+ * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onActivated
+ * @param gdbtodo activeInfo gdbtodo
+ */
 function tabActivated(activeInfo) {
 	if(NoFocusPinnedTab)
 		chrome.windows.get(
@@ -210,6 +208,11 @@ function unfocusPinnedTab(targetWindow) {
 	);
 }
 
+/**
+ * gdbtodo
+ * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onCreated
+ * @param gdbtodo tab 
+ */
 function tabCreated(tab) {
 	if(NextCreateTriggersKeep) {
 		NextCreateTriggersKeep = false;
@@ -217,6 +220,12 @@ function tabCreated(tab) {
 	}
 }
 
+/**
+ * gdbtodo
+ * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onDetached
+ * @param gdbtodo tabId gdbtodo
+ * @param gdbtodo detachInfo gdbtodo
+ */
 function tabDetached(tabId, detachInfo) {
 	chrome.windows.get(
 		detachInfo.oldWindowId,
@@ -237,20 +246,29 @@ function closeWindowOnDetachLastRealTab(detachedWindow) {
 	chrome.windows.remove(detachedWindow.id);
 }
 
-function tabRemoved(tabId, removeInfo) {
+/**
+ * Fires whenever a tab is closed.
+ * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onRemoved
+ * @param {number} _tabId The ID of the tab that was closed (not used)
+ * @param {object} removeInfo An object with a .windowId property containing the window ID.
+ */
+function tabRemoved(_tabId, removeInfo) {
 	if(removeInfo.isWindowClosing)
 		return;
 	
 	keepSpecialTabs(removeInfo.windowId);
 }
 
+/**
+ * Fires when the local storage (where our settings are kept) change.
+ * https://developer.chrome.com/docs/extensions/reference/api/storage#event-onChanged
+ */
 function storageChanged() {
 	chrome.storage.sync.get(
 		[
 			KOPT_NoFocusTab,
 			KOPT_Page,
 			KOPT_CustomURL,
-			KOPT_LegacyKey // Old
 		],
 		function(items) {
 			var oldPinnedURL = PinnedTabURL;
@@ -260,23 +278,27 @@ function storageChanged() {
 			if(oldPinnedURL == PinnedTabURL)
 				return;
 			
-			convertAllWindows(oldPinnedURL, PinnedTabURL);
+			chrome.windows.getAll(
+				{
+					"populate":    true, 
+					"windowTypes": ["normal"]
+				},
+				function(windows){
+					for(var i = 0; i < windows.length; i++) {
+						convertWindow(windows[i], oldPinnedURL, newPinnedURL);
+					}
+				}
+			);
 		}
 	);
 }
-function convertAllWindows(oldPinnedURL, newPinnedURL) {
-	chrome.windows.getAll(
-		{
-			"populate":    true, 
-			"windowTypes": ["normal"]
-		},
-		function(windows){
-			for(var i = 0; i < windows.length; i++) {
-				convertWindow(windows[i], oldPinnedURL, newPinnedURL);
-			}
-		}
-	);
-}
+
+/**
+ * 
+ * @param {Window} targetWindow The window object to convert
+ * @param {string} oldPinnedURL The URL that we were previously using for our special pinned tabs
+ * @param {string} newPinnedURL The URL that we now want to use for our special pinned tabs
+ */
 function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
 	var firstTab = targetWindow.tabs[0];
 	if(!isOurTab(firstTab, oldPinnedURL))
