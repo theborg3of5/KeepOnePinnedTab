@@ -24,6 +24,9 @@ chrome.tabs.onRemoved.addListener(tabRemoved);
 chrome.storage.onChanged.addListener(storageChanged);
 // #endregion Event Listeners
 
+// Kick-off logic // gdb todo can I do this anymore, or do I need some other event to key off of?
+updateAllWindows();
+
 /* GDB TODO overall strategy:
 	Current:
 		Store settings in global variables
@@ -38,17 +41,62 @@ chrome.storage.onChanged.addListener(storageChanged);
 			There's some weird logic/assumptions going on in here, too.
 */
 
-function startup() {
-	chrome.storage.sync.get(
-		[
-			KOPT_NoFocusTab,
-			KOPT_Page,
-			KOPT_CustomURL,
-		],
-		() => updateAllWindows() // GDB TODO is this what I should actually be using, or could I just await on the bigger caller?
+/**
+ * Determine whether we should prevent our special pinned tab from getting focus (based on the user's settings).
+ * @returns true/false - should we block the pinned tab getting focus?
+ */
+async function shouldBlockPinnedTabFocus()
+{
+	return new Promise(
+		(resolve) =>
+		{
+			chrome.storage.sync.get(KOPT_NoFocusTab,
+				(settings) =>
+				{
+					resolve(settings[KOPT_NoFocusTab] ?? false);
+				}
+			)
+		}
 	);
 }
 
+/**
+ * Get the URL we should use for our special pinned tab.
+ * @returns Promise that resolves into the URL we should use for our pinned tab.
+ */
+async function getPinnedURL() {
+	return new Promise(
+		(resolve) =>
+		{
+			chrome.storage.sync.get([KOPT_Page, KOPT_CustomURL],
+				(settings) =>
+				{
+					let url = "";
+					switch (settings[KOPT_Page])
+					{
+						case PinnedTabPage_BlankLight:
+							url = chrome.runtime.getURL("Resources/blankLight.html");
+						case PinnedTabPage_BlankDark:
+							url = chrome.runtime.getURL("Resources/blankDark.html");
+						case PinnedTabPage_Custom:
+							url = settings[KOPT_CustomURL];
+						case PinnedTabPage_Default:
+						default:
+							url = "chrome://newtab/";
+					}
+
+					resolve(url);
+				}
+			)
+		}
+	);
+}
+
+/**
+ * Figure out what the pinned tab URL should be based on the give sync settings.
+ * @param {object} settings Sync storage object with the KOPT_Page and KOPT_CustomURL items on it.
+ * @returns The URL to use for our pinned tab.
+ */
 function calculatePinnedURL(settings) {
 	switch (settings[KOPT_Page])
 	{
@@ -62,49 +110,6 @@ function calculatePinnedURL(settings) {
 		default:
 			return "chrome://newtab/";
 	}
-}
-
-async function shouldBlockPinnedTabFocus()
-{
-	return new Promise(
-		(resolve, reject) =>
-		{
-			chrome.storage.sync.get([KOPT_NoFocusTab],
-				(settings) =>
-				{
-					if (settings[KOPT_NoFocusTab] === undefined)
-					{
-						reject(); // GDB TODO is this actually needed with something this simple, and a "false" default value?
-					}
-					else
-					{
-						resolve(KOPT_NoFocusTab);
-					}
-				}
-			)
-		}
-	);
-}
-
-async function getPinnedURL() {
-	return new Promise(
-		(resolve, reject) =>
-		{
-			chrome.storage.sync.get([KOPT_Page, KOPT_CustomURL],
-				(settings) =>
-				{
-					if (settings[KOPT_Page] === undefined)
-					{
-						reject(); // GDB TODO might want some added protection to make sure this doesn't happen?
-					}
-					else
-					{
-						resolve(calculatePinnedURL(settings));
-					}
-				}
-			)
-		}
-	);
 }
 
 async function getSyncValue(key)
@@ -379,6 +384,5 @@ async function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
 }
 
 
-startup();
 
 
