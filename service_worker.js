@@ -13,7 +13,7 @@ const KOPT_PinnedURL = "KeepOnePinnedTab_PinnedURL";
 // #endregion Constants
 
 // GDB TODO will need to get rid of these global variables, probably using chrome.storage.local instead (see https://developer.chrome.com/docs/extensions/develop/migrate/to-service-workers#persist-states)
-var NextCreateTriggersKeep  = false;
+// var NextCreateTriggersKeep  = false;
 
 
 // #region Event Listeners
@@ -46,6 +46,7 @@ updateAllWindows();
 		"keep special tabs" - same basic idea, but clean up and document
 */
 
+// #region Settings getters
 /**
  * Determine whether we should prevent our special pinned tab from getting focus (based on the user's settings).
  * @returns true/false - should we block the pinned tab getting focus?
@@ -98,35 +99,31 @@ function calculatePinnedURL(settings) {
 			return "chrome://newtab/";
 	}
 }
+// #endregion Settings getters
 
-function updateAllWindows() {
-	chrome.windows.getAll(
-		{
-			"populate":    true,
-			"windowTypes": ["normal"]
-		},
-		function(windows){
-			for(var i = 0; i < windows.length; i++) // GDB TODO seems like this would be better as a for each/for in (whichever it is) or even an array.foreach
-				keepSpecialTabs(windows[i].id);
-		}
-	);
+async function updateAllWindows()
+{
+	const windows = await chrome.windows.getAll({ "populate": true, "windowTypes": ["normal"] });
+	
+	windows.forEach(window => { keepSpecialTabs(window.id) });
+	// for(var i = 0; i < windows.length; i++) // GDB TODO seems like this would be better as a for each/for in (whichever it is) or even an array.foreach
+	// 	keepSpecialTabs(windows[i].id);
 }
 
-function keepSpecialTabs(targetWindowId) {
+async function keepSpecialTabs(targetWindowId) {
 	if(!targetWindowId)
 		return;
 	
-	chrome.windows.get(
-		targetWindowId,
-		{
-			"populate":    true,
-			"windowTypes": ["normal"]
-		},
-		async (targetWindow) => {
-			if(!await tryKeepPinnedTab(targetWindow)) // Only check for the additional tab if we didn't just create a pinned one. // GDB TODO but why?
-				keepAdditionalTab(targetWindow);
-		}
-	);
+	const targetWindow = await chrome.windows.get(targetWindowId, {
+		"populate": true,
+		"windowTypes": ["normal"]
+	});
+
+	if (!targetWindow)
+		return
+
+	if(!await tryKeepPinnedTab(targetWindow)) // Only check for the additional tab if we didn't just create a pinned one. // GDB TODO but why?
+		keepAdditionalTab(targetWindow);
 }
 
 async function tryKeepPinnedTab(targetWindow) { // GDB TODO return value doesn't really make sense, clean up
@@ -209,8 +206,11 @@ function createAdditionalTab(targetWindow) {
  * https://developer.chrome.com/docs/extensions/reference/api/windows#event-onCreated
  * @param {gdbtodo} newWindow gdbtodo
  */
-function windowCreated(newWindow) {
-	NextCreateTriggersKeep = true;
+async function windowCreated(newWindow) {
+	// NextCreateTriggersKeep = true;
+	// await chrome.storage.local.set({ "WindowCreated": true });
+	console.log("Created window: " + newWindow.id.toString());
+	keepSpecialTabs(newWindow.id); // GDB TODO see attach event below, for: why does doing this here (but not in tab creation) cause an error on merging a tab back into an existing window?
 }
 
 /**
@@ -264,12 +264,22 @@ function unfocusPinnedTab(targetWindow) {
  * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onCreated
  * @param gdbtodo tab 
  */
-function tabCreated(tab) {
-	if(NextCreateTriggersKeep) {
-		NextCreateTriggersKeep = false;
-		keepSpecialTabs(tab.windowId);
-	}
+async function tabCreated(tab)
+{
+	// When the first tab in a new window gets created, add in our special pinned tab.
+	// if (await chrome.storage.local.get(["WindowCreated"]))
+	// {
+	// 	// NextCreateTriggersKeep = false;
+	// 	await chrome.storage.local.set({"WindowCreated": false})
+	// 	keepSpecialTabs(tab.windowId);
+	// }
 }
+
+chrome.tabs.onAttached.addListener((tabId, attachInfo) =>
+{
+	console.log("Tab attached: " + tabId.toString() + " to window: " + attachInfo.newWindowId);
+	// GDB TODO next step for window creation error: this fires for the tab prior to detach, so set a flag to say we're currently attaching this tab and to ignore its detach event accordingly.
+});
 
 /**
  * gdbtodo
@@ -277,24 +287,30 @@ function tabCreated(tab) {
  * @param gdbtodo tabId gdbtodo
  * @param gdbtodo detachInfo gdbtodo
  */
-function tabDetached(tabId, detachInfo) {
-	chrome.windows.get(
-		detachInfo.oldWindowId,
-		{
-			"populate": true
-		},
-		closeWindowOnDetachLastRealTab
-	);
-}
-async function closeWindowOnDetachLastRealTab(detachedWindow) {
+async function tabDetached(tabId, detachInfo) {
+	console.log("Tab detached from window: " + detachInfo.oldWindowId.toString());
+	
+	const detachedWindow = await chrome.windows.get(detachInfo.oldWindowId, { "populate": true });
+	
 	if(!detachedWindow)
 		return;
-	if(detachedWindow.tabs.length != 1)
+	// if(!await chrome.windows.get(detachedWindow.id, {
+	// 	"populate": true,
+	// 	"windowTypes": ["normal"]
+	// });
+	if (detachedWindow.tabs.length != 1)
 		return;
 	if(!await isOurTab(detachedWindow.tabs[0]))
 		return;
 	
-	chrome.windows.remove(detachedWindow.id);
+	try	{
+		chrome.windows.remove(detachedWindow.id);
+	}
+	catch (error)
+	{ 
+		// The above sometimes fails on attaching a new tab to an existing window, because onDetached fires
+		// on attaching for some reason - but we don't care because the window already closed.
+	}
 }
 
 /**
