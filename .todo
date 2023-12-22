@@ -6,8 +6,7 @@ Consider ignoring tabs in collapsed groups when counting how many tabs besides o
 		var groupId = targetWindow.tabs[1].groupId;
 		var group = chrome.tabGroups.get(groupId);
 		console.log(group.collapsed);
-Clean out "legacy" handling for old settings key
-Make tab filter a little less granular?
+Make tab URL filter a little less granular?
 	Already just checks the beginning (I think)
 	Make http vs https not matter?
 		Might need a setting in this case, though - maybe an "exact match" checkbox?
