@@ -17,16 +17,134 @@ const KOPT_PinnedURL = "KeepOnePinnedTab_PinnedURL";
 
 
 // #region Event Listeners
-chrome.windows.onCreated.addListener(windowCreated);
-chrome.tabs.onActivated.addListener(tabActivated);
-chrome.tabs.onCreated.addListener(tabCreated);
-chrome.tabs.onDetached.addListener(tabDetached);
-chrome.tabs.onRemoved.addListener(tabRemoved);
-chrome.storage.onChanged.addListener(storageChanged);
+// chrome.windows.onCreated.addListener(windowCreated);
+// chrome.tabs.onActivated.addListener(tabActivated);
+
+// chrome.tabs.onCreated.addListener(tabCreated);
+// chrome.tabs.onDetached.addListener(tabDetached);
+// chrome.tabs.onRemoved.addListener(tabRemoved);
+// chrome.storage.onChanged.addListener(storageChanged);
 // #endregion Event Listeners
 
-// Kick-off logic // gdb todo can I do this anymore, or do I need some other event to key off of?
-updateAllWindows();
+chrome.windows.onCreated.addListener((newWindow) => 
+{
+	console.log("Created window: " + newWindow.id.toString());
+	console.log(newWindow);
+
+	keepNeededTabs(newWindow.id);
+
+	// chrome.alarms.create("windowCreateFinish", {
+	// 	when: (Date.now() + 5000)
+  	// });
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+	if (alarm.name !== "windowCreateFinish")
+		return;
+
+	console.log("Alarm went off!");
+	updateAllWindows();
+});
+
+
+chrome.tabs.onCreated.addListener((tab) =>
+{
+	console.log("Tab created: " + tab);
+	console.log(tab);
+});
+
+chrome.tabs.onRemoved.addListener((tabId, removeInfo) =>
+{
+	console.log("Tab removed: " + tabId.toString());
+	console.log(removeInfo);
+	
+	// If the window is closing (as in the user is trying to close the whole window) then just let it happen.
+	if (removeInfo.isWindowClosing)
+		return;
+	
+	keepNeededTabs(removeInfo.windowId);
+});
+
+chrome.tabs.onAttached.addListener(async (tabId, attachInfo) =>
+{
+	console.log("Tab attached: " + tabId.toString());
+	console.log(attachInfo);
+
+	// keepSpecialTabs(attachInfo.newWindowId);
+});
+
+chrome.tabs.onDetached.addListener((tabId, detachInfo) => 
+{
+	console.log("Tab detached: " + tabId.toString());
+	console.log(detachInfo);
+
+	// keepSpecialTabs(detachInfo.oldWindowId);
+});
+
+
+chrome.tabs.onActivated.addListener(async (activeInfo) =>
+{ 
+	console.log("Tab activated: " + activeInfo.tabId.toString());
+	console.log(activeInfo);
+
+	// We only care about activations if we're trying to block activation of our pinned tab.
+	if (!await shouldBlockPinnedTabFocus())
+		return;
+	
+	const activeTab = await chrome.tabs.get(activeInfo.tabId);
+	if (!activeTab || (activeTab == undefined))
+		return;
+	if (!activeTab.active) // Not active anymore
+		return;
+	if (activeTab.index !== 0) // Not the first tab
+		return;
+	if (!isSpecialPinnedTab(activeTab, await getPinnedURL())) // Not our special pinned tab
+		return;
+	
+	await unfocusTab(activeTab);
+});
+
+async function unfocusTab(tab)
+{ 
+	if (!tab || (tab == undefined))
+		return;
+
+	const window = await getWindow(tab.windowId);
+	if (!window)
+		return;
+
+	// Safety check: make sure there should be a tab there to focus.
+	if(window.tabs.length < 2)
+		return;
+	
+	// Focus the following tab.
+	chrome.tabs.update(window.tabs[1].id, { active: true });
+}
+
+async function getWindow(windowId)
+{
+	if (windowId == "")
+		return null;
+
+	const window = await chrome.windows.get(
+		windowId,
+		{
+			"populate": true,
+			"windowTypes": ["normal"]
+		}
+	);
+	if (!window || (window == undefined))
+		return null;
+
+	return window;
+}
+
+// On startup and around every 15 seconds, make sure all windows have the tabs they need (catches
+// stuff like detached tabs).
+chrome.alarms.create("windowCreateFinish", {
+	periodInMinutes: .25,
+	when: Date.now()
+});
 
 /* GDB TODO overall strategy:
 	Current:
@@ -42,7 +160,13 @@ updateAllWindows();
 			There's some weird logic/assumptions going on in here, too.
 	New:
 		Settings as async getter functions (that can be await'd)
-		On tab activate, creation, detach, close, on settings change - same as before (but cleaned up and documented)
+		On tab activation - same as before
+		On tab creation - nothing
+		On window creation - keep special tabs
+		On tab detach, consider closing the special tabs (might have to suspend keep on close for that specific window or tab)
+			If that doesn't work, go back to closing the whole window like before.
+		On tab close (remove), check that tab's window to make sure we have the proper tabs (could maybe expand it to all windows, but that might be overkill)
+		On settings change - same as before (just now using async getter functions)
 		"keep special tabs" - same basic idea, but clean up and document
 */
 
@@ -104,57 +228,62 @@ function calculatePinnedURL(settings) {
 async function updateAllWindows()
 {
 	const windows = await chrome.windows.getAll({ "populate": true, "windowTypes": ["normal"] });
-	
-	windows.forEach(window => { keepSpecialTabs(window.id) });
-	// for(var i = 0; i < windows.length; i++) // GDB TODO seems like this would be better as a for each/for in (whichever it is) or even an array.foreach
-	// 	keepSpecialTabs(windows[i].id);
+	windows.forEach(window => { keepNeededTabs(window.id) });
 }
 
-async function keepSpecialTabs(targetWindowId) {
+async function keepNeededTabs(targetWindowId) {
 	if(!targetWindowId)
 		return;
 	
-	const targetWindow = await chrome.windows.get(targetWindowId, {
-		"populate": true,
-		"windowTypes": ["normal"]
-	});
-
-	if (!targetWindow)
+	const targetWindow = await getWindow(targetWindowId);
+	if (!targetWindow || (targetWindow == undefined) )
 		return
 
-	if(!await tryKeepPinnedTab(targetWindow)) // Only check for the additional tab if we didn't just create a pinned one. // GDB TODO but why?
-		keepAdditionalTab(targetWindow);
+	const pinnedURL = await getPinnedURL();
+	
+	// Safety checks
+	if(pinnedURL == "")
+		return;
+	if(targetWindow.type != "normal")
+		return;
+	
+	// Make sure our special pinned tab is the first one in the window.
+	if (!isSpecialPinnedTab(targetWindow.tabs[0], pinnedURL))
+	{
+		chrome.tabs.create({
+			"windowId": targetWindow.id,
+			"url":      pinnedURL,
+			"index":    0,
+			"pinned":   true,
+			"active":   false
+		});
+		
+		// Since new windows always have at least 1 tab to begin with, if we just added a pinned tab the
+		// window is guaranteed to have 2 (so we won't need to add an additional tab below).
+		return;
+	}
+
+	// Make sure we have at least 1 additional tab with our pinned tab (as a window with only our pinned
+	// tab will close if the user tries to close that tab).
+	if (targetWindow.tabs.length < 2)
+	{ 
+		chrome.tabs.create({
+			"windowId": targetWindow.id,
+			"active":   true
+		});
+	}
 }
 
-async function tryKeepPinnedTab(targetWindow) { // GDB TODO return value doesn't really make sense, clean up
-	if(await getPinnedURL() == "")
+
+function isSpecialPinnedTab(tab, urlToCheck) { // GDB TODO rename (honestly most of these functions)
+	if (urlToCheck == "")
 		return false;
-	if(targetWindow.type != "normal")
-		return false;
-	
-	if(await needPinnedTab(targetWindow)) {
-		await createPinnedTab(targetWindow);
-		return true; // Created a new pinned tab
-	}
-	
-	return false;
-}
-async function needPinnedTab(targetWindow) {
-	if(targetWindow == undefined)
-		return false;
-	if(await isOurTab(targetWindow.tabs[0])) // Our desired tab already exists.
-		return false; 
-	
-	return true;
-}
-async function isOurTab(tab, urlToCheck = "") { // GDB TODO rename (honestly most of these functions)
-	if(!tab)
+	if(!tab || (tab == undefined) )
 		return false;
 	if(!tab.pinned)
 		return false;
 	
-	if (urlToCheck == "")
-		urlToCheck = await getPinnedURL();
+	// Make sure the tab has (or will have once it loads) our target URL.
 	if ((tab.url.indexOf(urlToCheck) === -1) && (tab.pendingUrl.indexOf(urlToCheck) === -1))
 		return false;
 	
@@ -208,9 +337,35 @@ function createAdditionalTab(targetWindow) {
  */
 async function windowCreated(newWindow) {
 	// NextCreateTriggersKeep = true;
+	// const key =  + newWindow.id.toString();
 	// await chrome.storage.local.set({ "WindowCreated": true });
+
+	// setWindowJustCreated(newWindow.id, true);
+
 	console.log("Created window: " + newWindow.id.toString());
-	keepSpecialTabs(newWindow.id); // GDB TODO see attach event below, for: why does doing this here (but not in tab creation) cause an error on merging a tab back into an existing window?
+	keepNeededTabs(newWindow.id); // GDB TODO see attach event below, for: why does doing this here (but not in tab creation) cause an error on merging a tab back into an existing window?
+}
+
+async function setWindowJustCreated(windowId, toValue)
+{ 
+	const windowCreated = await chrome.storage.local.get(["WindowCreated"])
+	
+	if (!windowCreated)
+	{
+		windowCreated = {};
+		await chrome.storage.local.set({ "WindowCreated": windowCreated });
+	}
+	
+	windowCreated[windowId] = toValue;
+}
+
+async function wasWindowJustCreated(windowId)
+{ 
+	const windowCreated = await chrome.storage.local.get(["WindowCreated"])
+
+	return windowCreated[windowId];
+
+	// await chrome.storage.local.set({ "WindowCreated": true });
 }
 
 /**
@@ -219,30 +374,32 @@ async function windowCreated(newWindow) {
  * @param gdbtodo activeInfo gdbtodo
  */
 async function tabActivated(activeInfo) {
-	if (await shouldBlockPinnedTabFocus())
-	{
-		chrome.windows.get(
-			activeInfo.windowId,
-			{
-				"populate": true,
-				"windowTypes": ["normal"]
-			},
-			async function (targetWindow)
-			{
-				if (await ourTabIsFocused(targetWindow))
-					unfocusPinnedTab(targetWindow);
-			}
-		);
-	}
+	if (!await shouldBlockPinnedTabFocus())
+		return;
+
+	// GDB TODO back here
+		// chrome.windows.get(
+		// 	activeInfo.windowId,
+		// 	{
+		// 		"populate": true,
+		// 		"windowTypes": ["normal"]
+		// 	},
+		// 	function (targetWindow)
+		// 	{
+		// 		if (ourTabIsFocused(targetWindow))
+		// 			unfocusPinnedTab(targetWindow);
+		// 	}
+		// );
 }
 async function ourTabIsFocused(targetWindow) {
-	var firstTab = targetWindow.tabs[0];
+	if(!targetWindow || (targetWindow == undefined) )
+		return false;
 	
-	if(!targetWindow)
-		return false;
-	if(!await isOurTab(firstTab))
-		return false;
+	var firstTab = targetWindow.tabs[0];
 	if(!firstTab.active)
+		return false;
+	
+	if(!isSpecialPinnedTab(firstTab, await getPinnedURL()))
 		return false;
 	
 	return true;
@@ -266,20 +423,17 @@ function unfocusPinnedTab(targetWindow) {
  */
 async function tabCreated(tab)
 {
-	// When the first tab in a new window gets created, add in our special pinned tab.
+	// // When the first tab in a new window gets created, add in our special pinned tab.
+	// // if (await wasWindowJustCreated(tab.windowId))
 	// if (await chrome.storage.local.get(["WindowCreated"]))
 	// {
 	// 	// NextCreateTriggersKeep = false;
-	// 	await chrome.storage.local.set({"WindowCreated": false})
+	// 	await chrome.storage.local.set({ "WindowCreated": false })
+	// 	// setWindowJustCreated(tab.windowId, false);
 	// 	keepSpecialTabs(tab.windowId);
 	// }
+	console.log("Tab created: " + tab.id.toString());
 }
-
-chrome.tabs.onAttached.addListener((tabId, attachInfo) =>
-{
-	console.log("Tab attached: " + tabId.toString() + " to window: " + attachInfo.newWindowId);
-	// GDB TODO next step for window creation error: this fires for the tab prior to detach, so set a flag to say we're currently attaching this tab and to ignore its detach event accordingly.
-});
 
 /**
  * gdbtodo
@@ -287,8 +441,8 @@ chrome.tabs.onAttached.addListener((tabId, attachInfo) =>
  * @param gdbtodo tabId gdbtodo
  * @param gdbtodo detachInfo gdbtodo
  */
-async function tabDetached(tabId, detachInfo) {
-	console.log("Tab detached from window: " + detachInfo.oldWindowId.toString());
+async function tabDetached(tabId, detachInfo) { // GDB TODO should I just get rid of the extra pinned tab here rather than trying to hit the whole window?
+	console.log("Tab detached from window: " + detachInfo.oldWindowId.toString()); // GDB TODO might take an override or something to say "ignore tabRemoved for this particular window", maybe?
 	
 	const detachedWindow = await chrome.windows.get(detachInfo.oldWindowId, { "populate": true });
 	
@@ -300,7 +454,7 @@ async function tabDetached(tabId, detachInfo) {
 	// });
 	if (detachedWindow.tabs.length != 1)
 		return;
-	if(!await isOurTab(detachedWindow.tabs[0]))
+	if(!isSpecialPinnedTab(detachedWindow.tabs[0]))
 		return;
 	
 	try	{
@@ -323,7 +477,7 @@ function tabRemoved(_tabId, removeInfo) {
 	if(removeInfo.isWindowClosing)
 		return;
 	
-	keepSpecialTabs(removeInfo.windowId);
+	keepNeededTabs(removeInfo.windowId);
 }
 
 /**
@@ -362,7 +516,7 @@ function storageChanged(changes)
  */
 async function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
 	var firstTab = targetWindow.tabs[0];
-	if(!await isOurTab(firstTab, oldPinnedURL))
+	if(!isSpecialPinnedTab(firstTab, oldPinnedURL))
 		return;
 	
 	chrome.tabs.update(
