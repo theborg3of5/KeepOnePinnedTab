@@ -229,20 +229,28 @@ async function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
  */
 async function getWindow(windowId)
 {
-	if (windowId == "")
-		return null;
+	try
+	{
+		if ((windowId == "") || (windowId == undefined))
+			return null;
 
-	const window = await chrome.windows.get(
-		windowId,
-		{
-			"populate": true,
-			"windowTypes": ["normal"]
-		}
-	);
-	if (!window || (window == undefined))
-		return null;
+		const window = await chrome.windows.get(
+			windowId,
+			{
+				"populate": true,
+				"windowTypes": ["normal"]
+			}
+		);
+		if (!window || (window == undefined))
+			return null;
 
-	return window;
+		return window;
+	}
+	catch (error)
+	{ 
+		console.log("Failed to get window with ID: " + windowId.toString());
+		return null;
+	}
 }
 
 
