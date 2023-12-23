@@ -14,66 +14,40 @@ const KOPT_PinnedURL = "KeepOnePinnedTab_PinnedURL";
 // #endregion Constants
 
 // #region Event Listeners
-chrome.windows.onCreated.addListener(windowCreated);
-chrome.tabs.onRemoved.addListener(tabClosed);
-chrome.tabs.onActivated.addListener(tabActivated);
-chrome.storage.onChanged.addListener(storageChanged);
-chrome.alarms.onAlarm.addListener(updateAllWindows);
-// #endregion Event Listeners
-
-
-// On startup and around every 15 seconds, make sure all windows have the tabs they need (catches
-// stuff like detached tabs). The alarm calls updateAllWindows().
-chrome.alarms.create("windowCreateFinish", {
-	periodInMinutes: .25,
-	when: Date.now()
-}); // GDB TODO make sure my changelogs and whatnot refer to this as a rewrite now
-
-
-/**
- * Check all windows and make sure they have the tabs we need.
- */
-async function updateAllWindows()
-{
-	const windows = await chrome.windows.getAll({ "populate": true, "windowTypes": ["normal"] });
-	windows.forEach(window => { keepNeededTabs(window.id) });
-}
-
-
-/**
- * GDBTODO
+/** 
+ * On window creation, make sure the new window gets all of the tabs we need.
  * https://developer.chrome.com/docs/extensions/reference/api/windows#event-onCreated
- * @param {gdbtodo} newWindow gdbtodo
+ * @param {Window} newWindow New window object, we use these properties:
+ * 					.id - Window ID
  */
-function windowCreated(newWindow)
-{
+chrome.windows.onCreated.addListener((newWindow) => { 
 	keepNeededTabs(newWindow.id);
-}
-
+});
 
 /**
- * Fires whenever a tab is closed - we use this to make sure we have enough tabs.
+ * Whenever a tab is closed, make sure its window has all of the tabs we need.
  * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onRemoved
  * @param {number} _tabId The ID of the tab that was closed (not used)
- * @param {object} removeInfo An object with these properties that we care about:
- * 						windowId        - ID of the window that the closed tab was in
- * 						isWindowClosing - true if the entire window is closing
+ * @param {object} removeInfo An object, we use these properties:
+ * 						.windowId        - ID of the window that the closed tab was in
+ * 						.isWindowClosing - true if the entire window is closing
  */
-function tabClosed(_tabId, removeInfo) {
+chrome.tabs.onRemoved.addListener((_tabId, removeInfo) => 
+{
 	// If the window is closing (as in the user is trying to close the whole window) then just let it happen.
 	if (removeInfo.isWindowClosing)
 		return;
 	
 	keepNeededTabs(removeInfo.windowId);
-}
-
+});
 
 /**
- * gdbtodo
+ * Whenever a tab gets activated, check if it's our pinned tab and try to deactivate it if so.
  * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onActivated
- * @param gdbtodo activeInfo gdbtodo
+ * @param activeInfo An object, we use these properties:
+ * 			.tabId - ID of the activated tab
  */
-async function tabActivated(activeInfo)
+chrome.tabs.onActivated.addListener(async (activeInfo) =>
 { 
 	// We only care about activations if we're trying to block activation of our pinned tab.
 	if (!await shouldBlockPinnedTabFocus())
@@ -90,35 +64,56 @@ async function tabActivated(activeInfo)
 		return;
 	
 	await unfocusTab(activeTab);
-}
+});
 
 /**
- * gdbtodo
- * @param {*} tab 
- * @returns 
+ * Fires when the sync storage (where our settings live) changes, so we can update things as needed.
+ * https://developer.chrome.com/docs/extensions/reference/api/storage#event-onChanged
+ * @param {object} changes Contains all changed keys with oldValue/newValue inside.
  */
-async function unfocusTab(tab)
-{ 
-	if (!tab || (tab == undefined))
+chrome.storage.onChanged.addListener((changes) =>
+{
+	// Only need to worry about updating things if something about the pinned tab URL changed.
+	if (!changes[KOPT_PinnedURL])
 		return;
 
-	const window = await getWindow(tab.windowId);
-	if (!window)
-		return;
+	const { oldValue, newValue } = changes[KOPT_PinnedURL]; // GDB TODO finish converting everything over (conversion and the like) to new simplified settings node
+	const oldPinnedURL = oldValue;
+	const newPinnedURL = newValue;
 
-	// Safety check: make sure there should be a tab there to focus.
-	if(window.tabs.length < 2)
-		return;
-	
-	// Focus the following tab. // GDB TODO reword setting on settings page to just be about keyboard focus (because I can't block mouse focus for some reason)
-	chrome.tabs.update(window.tabs[1].id, { active: true }); // GDB TODO figure out a way to mitigate (or at least suppress?) the error when clicking on the tab
-}
+	chrome.windows.getAll(
+		{
+			"populate":    true, 
+			"windowTypes": ["normal"]
+		},
+		function(windows){
+			for(var i = 0; i < windows.length; i++) {
+				convertWindow(windows[i], oldPinnedURL, newPinnedURL);
+			}
+		}
+	);
+});
+
+/** 
+ * Every quarter-minute (15s), make sure all windows have the tabs they need 
+ * (handles stuff like detached tabs that don't reliably get it otherwise). 
+ */
+chrome.alarms.create("windowCreateFinish", {
+	periodInMinutes: .25,
+	when: Date.now()
+});
+chrome.alarms.onAlarm.addListener(async () =>
+{
+	const windows = await chrome.windows.getAll({ "populate": true, "windowTypes": ["normal"] });
+	windows.forEach(window => { keepNeededTabs(window.id) });
+});
+// #endregion Event Listeners
 
 
 /**
- * gdbtodo
- * @param {*} targetWindowId 
- * @returns 
+ * Core logic: check the given window to make sure it has our special pinned tab and 
+ * at least 1 additional tab.
+ * @param {number} targetWindowId - ID of the window to check
  */
 async function keepNeededTabs(targetWindowId) {
 	if(!targetWindowId)
@@ -164,10 +159,10 @@ async function keepNeededTabs(targetWindowId) {
 }
 
 /**
- * gdbtodo
- * @param {*} tab 
- * @param {*} urlToCheck 
- * @returns 
+ * Check whether the given tab is our special pinned one (a pinned tab with our specific URL).
+ * @param {Tab} tab The tab to check
+ * @param {string} urlToCheck The URL the tab should have
+ * @returns true/false - is the given tab our special pinned one?
  */
 function isSpecialPinnedTab(tab, urlToCheck) { // GDB TODO rename (honestly most of these functions)
 	if (urlToCheck == "")
@@ -184,37 +179,31 @@ function isSpecialPinnedTab(tab, urlToCheck) { // GDB TODO rename (honestly most
 	return true;
 }
 
-
 /**
- * Fires when the local storage (where our settings are kept) change.
- * https://developer.chrome.com/docs/extensions/reference/api/storage#event-onChanged
- * @param {object} changes Contains all changed keys with oldValue/newValue inside.
+ * Try to "unfocus" the given tab (by trying to focus the second tab in the window).
+ * @param {Tab} tab Tab object, we use these properties:
+ * 					.windowId - The tab's parent window ID
  */
-function storageChanged(changes)
-{
-	// Only need to worry about updating things if something about the pinned tab URL changed.
-	if (!changes[KOPT_PinnedURL])
+async function unfocusTab(tab)
+{ 
+	if (!tab || (tab == undefined))
 		return;
 
-	const { oldValue, newValue } = changes[KOPT_PinnedURL]; // GDB TODO finish converting everything over (conversion and the like) to new simplified settings node
-	const oldPinnedURL = oldValue;
-	const newPinnedURL = newValue;
+	const window = await getWindow(tab.windowId);
+	if (!window)
+		return;
 
-	chrome.windows.getAll(
-		{
-			"populate":    true, 
-			"windowTypes": ["normal"]
-		},
-		function(windows){
-			for(var i = 0; i < windows.length; i++) {
-				convertWindow(windows[i], oldPinnedURL, newPinnedURL);
-			}
-		}
-	);
+	// Safety check: make sure there should be a tab there to focus.
+	if(window.tabs.length < 2)
+		return;
+	
+	// Focus the following tab. // GDB TODO reword setting on settings page to just be about keyboard focus (because I can't block mouse focus for some reason)
+	chrome.tabs.update(window.tabs[1].id, { active: true }); // GDB TODO figure out a way to mitigate (or at least suppress?) the error when clicking on the tab
 }
 
 /**
  * "Convert" a window over to a new pinned tab URL (replacing the old pinned tab with a new one).
+ * Used when our settings change.
  * @param {Window} targetWindow The window object to convert
  * @param {string} oldPinnedURL The URL that we were previously using for our special pinned tabs
  * @param {string} newPinnedURL The URL that we now want to use for our special pinned tabs
@@ -232,12 +221,11 @@ async function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
 	);
 }
 
-
 /**
- * Wrapper for getting a window that just makes sure we return easy-to-deal-with values (null, not
+ * Convenience wrapper for getting a window that just makes sure we return easy-to-deal-with values (null, not
  * undefined) in weird situations.
- * @param {*} windowId gdbtodo
- * @returns gdbtodo
+ * @param {number} windowId ID of the window to get
+ * @returns Window object matching the given ID.
  */
 async function getWindow(windowId)
 {
