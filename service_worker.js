@@ -14,13 +14,14 @@ const KOPT_PinnedURL = "KeepOnePinnedTab_PinnedURL";
 // #endregion Constants
 
 // #region Event Listeners
-/** 
- * On window creation, make sure the new window gets all of the tabs we need.
- * https://developer.chrome.com/docs/extensions/reference/api/windows#event-onCreated
- * @param {Window} _newWindow New window object, not used.
+/**
+ * Whenever a new tab is created, make sure its window has all of the tabs we need.
+ * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onCreated
+ * @param {Tab} Tab that was created.
  */
-chrome.windows.onCreated.addListener((_newWindow) => { 
-	chrome.alarms.create({ when: Date.now() }); // We can't call keepNeededTabs directly because the window's not always ready for its tabs to be manipulated when this fires.
+chrome.tabs.onCreated.addListener((tab) =>
+{
+	keepNeededTabs(tab.windowId);
 });
 
 /**
