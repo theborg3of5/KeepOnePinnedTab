@@ -42,6 +42,37 @@ chrome.tabs.onRemoved.addListener((_tabId, removeInfo) =>
 });
 
 /**
+ * When a tab is detached from a window, check that window - if all that's left 
+ * is our special pinned tab, close it to avoid leaving behind a useless window.
+ * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onDetached
+ * @param {number} tabId ID of the tab that was detached (not used)
+ * @param {object} detachInfo An object, we use these properties:
+ * 					.oldWindowId - ID of the window that the tab was detached from.
+ */
+chrome.tabs.onDetached.addListener(async (tabId, detachInfo) =>
+{
+	const detachedWindow = await getWindow(detachInfo.oldWindowId);
+	if (!detachedWindow)
+		return;
+	
+	if (detachedWindow.tabs.length != 1) // Window has other tabs
+		return;
+	if (!isSpecialPinnedTab(detachedWindow.tabs[0], await getPinnedURL())) // Not our special pinned tab
+		return;
+	
+	try
+	{
+		chrome.windows.remove(detachedWindow.id);
+	}
+	catch (error)
+	{
+		console.log(error);
+		// The above sometimes fails on attaching a new tab to an existing window, because onDetached fires
+		// on attaching for some reason - but we don't care because the window already closed.
+	}
+});
+
+/**
  * Whenever a tab gets activated, check if it's our pinned tab and try to deactivate it if so.
  * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onActivated
  * @param activeInfo An object, we use these properties:
