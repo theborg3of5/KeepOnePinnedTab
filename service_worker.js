@@ -17,11 +17,10 @@ const KOPT_PinnedURL = "KeepOnePinnedTab_PinnedURL";
 /** 
  * On window creation, make sure the new window gets all of the tabs we need.
  * https://developer.chrome.com/docs/extensions/reference/api/windows#event-onCreated
- * @param {Window} newWindow New window object, we use these properties:
- * 					.id - Window ID
+ * @param {Window} _newWindow New window object, not used.
  */
-chrome.windows.onCreated.addListener((newWindow) => { 
-	keepNeededTabs(newWindow.id);
+chrome.windows.onCreated.addListener((_newWindow) => { 
+	chrome.alarms.create({ when: Date.now() }); // We can't call keepNeededTabs directly because the window's not always ready for its tabs to be manipulated when this fires.
 });
 
 /**
@@ -129,7 +128,7 @@ chrome.storage.onChanged.addListener((changes) =>
  * Every quarter-minute (15s), make sure all windows have the tabs they need 
  * (handles stuff like detached tabs that don't reliably get it otherwise). 
  */
-chrome.alarms.create("windowCreateFinish", {
+chrome.alarms.create("KOPT_MainLoop", {
 	periodInMinutes: .25,
 	when: Date.now()
 });
