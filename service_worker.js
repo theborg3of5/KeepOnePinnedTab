@@ -66,9 +66,10 @@ chrome.tabs.onDetached.addListener(async (tabId, detachInfo) =>
 	}
 	catch (error)
 	{
-		console.log(error);
 		// The above sometimes fails on attaching a new tab to an existing window, because onDetached fires
-		// on attaching for some reason - but we don't care because the window already closed.
+		// on attaching (because it's getting detached from its temporary window, I guess?) - but we don't 
+		// care because that temporary window is already closed (which was our goal).
+		console.log(error);
 	}
 });
 
@@ -175,8 +176,12 @@ async function keepNeededTabs(targetWindowId) {
 				"active": false
 			});
 		}
-		// This can fail sometimes if the user is actively dragging a tab, but we'll run this whole thing again shortly so we can just silently fail.
-		catch (error) { }
+		catch (error)
+		{
+			// The above can sometimes fail if the user is actively dragging a tab, but we'll run this whole thing
+			// again shortly so we can just fail silently.
+			return;
+		}
 		
 		// Since new windows always have at least 1 tab to begin with, if we just added a pinned tab the
 		// window is guaranteed to have 2 (so we won't need to add an additional tab below).
@@ -200,7 +205,7 @@ async function keepNeededTabs(targetWindowId) {
  * @param {string} urlToCheck The URL the tab should have
  * @returns true/false - is the given tab our special pinned one?
  */
-function isSpecialPinnedTab(tab, urlToCheck) { // GDB TODO rename (honestly most of these functions)
+function isSpecialPinnedTab(tab, urlToCheck) {
 	if (urlToCheck == "")
 		return false;
 	if(!tab || (tab == undefined) )
@@ -233,20 +238,37 @@ async function unfocusTab(tab, numAttempts = 0)
 	if(window.tabs.length < 2)
 		return;
 	
-	// Try to focus the following tab. // GDB TODO consider encapsulating this block, and the other spots where I have to try/catch.
-	try {
-		await chrome.tabs.update(window.tabs[1].id, { active: true });
+	// Try to focus the following tab.
+	tryFocusTab(window.tabs[1].id, 20);
+}
+
+/**
+ * Try to focus the specified tab.
+ * @param {string} tabId The ID of the tab to focus.
+ * @param {number} retriesToAllow How many times we can try (if we fail each time)
+ * @param {number} retriesSoFar How many times we've retried so far (only called by this function)
+ */
+async function tryFocusTab(tabId, retriesToAllow = 0, retriesSoFar = 0) { 
+	// Make sure the tab still exists - if not, give up.
+	const tab = await chrome.tabs.get(tabId);
+	if (!tab || (tab === undefined))
+		return;
+	
+	// Try to focus the tab.
+	try
+	{
+		await chrome.tabs.update(tabId, { active: true });
 	}
 	catch (error)
 	{
 		// Give up after about 2 seconds.
-		if (numAttempts > 20)
+		if (retriesSoFar > retriesToAllow)
 			return;
 	
 		// Sometimes this fails if the user doesn't let go of the button quick enough - try again.
 		setTimeout(() =>
 		{
-			unfocusTab(tab, numAttempts+1);
+			tryFocusTab(tabId, retriesToAllow, retriesSoFar + 1);
 		}, 100);
 	}
 }
