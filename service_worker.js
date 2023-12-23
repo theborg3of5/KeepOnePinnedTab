@@ -126,11 +126,11 @@ chrome.storage.onChanged.addListener((changes) =>
 });
 
 /** 
- * Every quarter-minute (15s), make sure all windows have the tabs they need 
+ * Every .05m (3s), make sure all windows have the tabs they need 
  * (handles stuff like detached tabs that don't reliably get it otherwise). 
  */
 chrome.alarms.create("KOPT_MainLoop", {
-	periodInMinutes: .25,
+	periodInMinutes: .05,
 	when: Date.now()
 });
 chrome.alarms.onAlarm.addListener(async () =>
@@ -151,7 +151,7 @@ async function keepNeededTabs(targetWindowId) {
 		return;
 	
 	const targetWindow = await getWindow(targetWindowId);
-	if (!targetWindow || (targetWindow == undefined) )
+	if (!targetWindow)
 		return
 
 	const pinnedURL = await getPinnedURL();
@@ -165,13 +165,18 @@ async function keepNeededTabs(targetWindowId) {
 	// Make sure our special pinned tab is the first one in the window.
 	if (!isSpecialPinnedTab(targetWindow.tabs[0], pinnedURL))
 	{
-		chrome.tabs.create({
-			"windowId": targetWindow.id,
-			"url":      pinnedURL,
-			"index":    0,
-			"pinned":   true,
-			"active":   false
-		});
+		try
+		{
+			chrome.tabs.create({
+				"windowId": targetWindow.id,
+				"url": pinnedURL,
+				"index": 0,
+				"pinned": true,
+				"active": false
+			});
+		}
+		// This can fail sometimes if the user is actively dragging a tab, but we'll run this whole thing again shortly so we can just silently fail.
+		catch (error) { }
 		
 		// Since new windows always have at least 1 tab to begin with, if we just added a pinned tab the
 		// window is guaranteed to have 2 (so we won't need to add an additional tab below).
@@ -215,7 +220,7 @@ function isSpecialPinnedTab(tab, urlToCheck) { // GDB TODO rename (honestly most
  * @param {Tab} tab Tab object, we use these properties:
  * 					.windowId - The tab's parent window ID
  */
-async function unfocusTab(tab)
+async function unfocusTab(tab, numAttempts = 0)
 { 
 	if (!tab || (tab == undefined))
 		return;
@@ -228,8 +233,22 @@ async function unfocusTab(tab)
 	if(window.tabs.length < 2)
 		return;
 	
-	// Focus the following tab. // GDB TODO reword setting on settings page to just be about keyboard focus (because I can't block mouse focus for some reason)
-	chrome.tabs.update(window.tabs[1].id, { active: true }); // GDB TODO figure out a way to mitigate (or at least suppress?) the error when clicking on the tab
+	// Try to focus the following tab. // GDB TODO consider encapsulating this block, and the other spots where I have to try/catch.
+	try {
+		await chrome.tabs.update(window.tabs[1].id, { active: true });
+	}
+	catch (error)
+	{
+		// Give up after about 2 seconds.
+		if (numAttempts > 20)
+			return;
+	
+		// Sometimes this fails if the user doesn't let go of the button quick enough - try again.
+		setTimeout(() =>
+		{
+			unfocusTab(tab, numAttempts+1);
+		}, 100);
+	}
 }
 
 /**
