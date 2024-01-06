@@ -147,8 +147,9 @@ chrome.alarms.onAlarm.addListener(async () =>
  * at least 1 additional tab.
  * @param {number} targetWindowId - ID of the window to check
  */
-async function keepNeededTabs(targetWindowId) {
-	if(!targetWindowId)
+async function keepNeededTabs(targetWindowId)
+{
+	if (!targetWindowId)
 		return;
 	
 	const targetWindow = await getWindow(targetWindowId);
@@ -158,9 +159,9 @@ async function keepNeededTabs(targetWindowId) {
 	const pinnedURL = await getPinnedURL();
 	
 	// Safety checks
-	if(pinnedURL == "")
+	if (pinnedURL == "")
 		return;
-	if(targetWindow.type != "normal")
+	if (targetWindow.type != "normal")
 		return;
 	
 	// Make sure our special pinned tab is the first one in the window.
@@ -190,7 +191,8 @@ async function keepNeededTabs(targetWindowId) {
 
 	// Make sure we have at least 1 additional tab with our pinned tab (as a window with only our pinned
 	// tab will close if the user tries to close that tab).
-	if (targetWindow.tabs.length < 2)
+	const uncollapsedTabs = await targetWindow.tabs.filter(tab => isTabCollapsed(tab));
+	if (uncollapsedTabs.length < 2)
 	{ 
 		chrome.tabs.create({
 			"windowId": targetWindow.id,
@@ -218,6 +220,27 @@ function isSpecialPinnedTab(tab, urlToCheck) {
 		return false;
 	
 	return true;
+}
+
+/**
+ * Check whether a tab is collapsed inside a group.
+ * @param {Tab} tab Tab to check
+ * @returns true/false - is the tab collapsed inside a group?
+ */
+async function isTabCollapsed(tab)
+{ 
+	if (!tab || (tab == undefined))
+		return false;
+
+	// No group - tab can't be collapsed inside of one
+	if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE)
+		return false;
+
+	const group = chrome.tabGroups.get(tab.groupId);
+	if (!group || (group == undefined))
+		return false;
+	
+	return group.collapsed;
 }
 
 /**
