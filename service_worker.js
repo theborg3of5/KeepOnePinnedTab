@@ -156,6 +156,10 @@ async function keepNeededTabs(targetWindowId)
 	if (!targetWindow)
 		return
 
+	// Safety check to make sure we're not creating infinite tabs
+	if (targetWindow.tabs.length > 50)
+		return;
+	
 	const pinnedURL = await getPinnedURL();
 	
 	// Safety checks
@@ -190,9 +194,11 @@ async function keepNeededTabs(targetWindowId)
 	}
 
 	// Make sure we have at least 1 additional tab with our pinned tab (as a window with only our pinned
-	// tab will close if the user tries to close that tab).
-	const uncollapsedTabs = await targetWindow.tabs.filter(tab => isTabCollapsed(tab));
-	if (uncollapsedTabs.length < 2)
+	// tab will close if the user tries to close that tab). Ignore tabs collapsed in a group so we're not
+	// forcing those groups to uncollapse if we're unfocusing the pinned tab.
+	const visibleTabs = await getVisibleTabs(targetWindow);
+	console.log(visibleTabs);
+	if (visibleTabs.length < 2)
 	{ 
 		chrome.tabs.create({
 			"windowId": targetWindow.id,
@@ -223,32 +229,53 @@ function isSpecialPinnedTab(tab, urlToCheck) {
 }
 
 /**
- * Check whether a tab is collapsed inside a group.
- * @param {Tab} tab Tab to check
- * @returns true/false - is the tab collapsed inside a group?
+ * Get an array of all of the "visible" tabs in the given window.
+ * Here, "visible" means that the tab is not inside a collapsed group.
+ * @param {Window} window The window to get tabs from
+ * @returns Array of all "visible" tabs.
  */
-async function isTabCollapsed(tab)
+async function getVisibleTabs(window)
+{ 
+	if (!window || (window == undefined))
+		return null;
+
+	const visibleTabs = [];
+	for (const tab of window.tabs) {
+		if(await isTabVisible(tab))
+			visibleTabs.push(tab);
+	}
+	
+	return visibleTabs;
+}
+
+/**
+ * Check whether a tab is "visible" (i.e. not inside a collapsed group).
+ * @param {Tab} tab Tab to check
+ * @returns true/false - is the tab "visible"?
+ */
+async function isTabVisible(tab)
 { 
 	if (!tab || (tab == undefined))
 		return false;
 
-	// No group - tab can't be collapsed inside of one
+	// No group - tab can't be collapsed inside of one, so it must be "visible".
 	if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE)
-		return false;
+		return true;
 
-	const group = chrome.tabGroups.get(tab.groupId);
-	if (!group || (group == undefined))
-		return false;
-	
-	return group.collapsed;
+	const group = await getGroup(tab.groupId);
+	if (!group)
+		return true;
+
+	return !group.collapsed;
 }
 
 /**
- * Try to "unfocus" the given tab (by trying to focus the second tab in the window).
+ * Try to "unfocus" the given tab (which is assumed to be our special pinned tab),
+ * by trying to focus the next tab in the window.
  * @param {Tab} tab Tab object, we use these properties:
  * 					.windowId - The tab's parent window ID
  */
-async function unfocusTab(tab, numAttempts = 0)
+async function unfocusTab(tab)
 { 
 	if (!tab || (tab == undefined))
 		return;
@@ -257,12 +284,20 @@ async function unfocusTab(tab, numAttempts = 0)
 	if (!window)
 		return;
 
-	// Safety check: make sure there should be a tab there to focus.
-	if(window.tabs.length < 2)
-		return;
-	
-	// Try to focus the following tab.
-	tryFocusTab(window.tabs[1].id, 20);
+	// We want to ape Ctrl+Tab, jumping to the next tab that's NOT inside a collapsed group -
+	// focusing a tab in a collapsed group forces that group to uncollapse, which is probably
+	// not what the user wants.
+	const visibleTabs = await getVisibleTabs(window);
+	if (visibleTabs.length >= 2)
+	{
+		// We have at least 1 uncollapsed tab (beyond our special pinned one) to focus - use that.
+		tryFocusTab(visibleTabs[1].id, 20); // We're assuming index 0 is our special pinned tab.
+	}
+	else
+	{
+		// If we don't have another uncollapsed tab, get one created instead.
+		keepNeededTabs(window.id);
+	}
 }
 
 /**
@@ -316,19 +351,20 @@ async function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
 	);
 }
 
+// #region Chrome object getters
 /**
- * Convenience wrapper for getting a window that just makes sure we return easy-to-deal-with values (null, not
- * undefined) in weird situations.
+ * Convenience wrapper for getting a window that handles bad (generally just-closed) window IDs without 
+ * throwing extension-level errors. Callers are expected to handle the returned null value appropriately instead.
  * @param {number} windowId ID of the window to get
  * @returns Window object matching the given ID.
  */
 async function getWindow(windowId)
 {
+	if ((windowId == "") || (windowId == undefined))
+		return null;
+	
 	try
 	{
-		if ((windowId == "") || (windowId == undefined))
-			return null;
-
 		const window = await chrome.windows.get(
 			windowId,
 			{
@@ -348,6 +384,33 @@ async function getWindow(windowId)
 	}
 }
 
+/**
+ * Convenience wrapper for getting a tab group that handles bad (generally just-closed) group IDs without
+ * throwing extension-level errors. Callers are expected to handle the returned null value appropriately instead.
+ * @param {number} groupId ID of the group to get
+ * @returns TabGroup object matching the given ID.
+ */
+async function getGroup(groupId)
+{ 
+	if ((groupId == "") || (groupId == undefined))
+		return null;
+
+	try
+	{
+		const group = await chrome.tabGroups.get(groupId);
+		if (!group || (group == undefined))
+			return null;
+
+		return group;
+	}
+	catch (error)
+	{ 
+		console.log("Failed to get group with ID: " + groupId.toString());
+		return null;
+	}
+	
+}
+// #endregion Chrome object getters
 
 // #region Settings getters
 /**
