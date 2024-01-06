@@ -1,4 +1,15 @@
-﻿
+﻿let KOPT = {};
+
+document.addEventListener('DOMContentLoaded', async () =>
+{
+	const val = (await chrome.storage.session.get("testyglobaly"))["testyglobaly"];
+	console.log(val);
+	KOPT.asdf = "ooh!"
+});
+
+// GDB TODO consider adding listeners directly for load/save like they do here: https://developer.chrome.com/docs/extensions/develop/ui/options-page
+// GDB TODO probably remove the "open_in_tab" from the manifest once everything is working happily again
+
 function loadOptions() {
 	chrome.storage.sync.get(
 		[
@@ -82,7 +93,7 @@ function updateCustomWarning(pinnedTabPage) {
 
 
 // Add the events to load/save from this page.
-document.addEventListener("DOMContentLoaded", loadOptions);
+document.addEventListener("DOMContentLoaded", loadOptions); // GDB TODO consider embedding these with () => {} stuff
 document.querySelector("#save").addEventListener("click", saveOptions);
 
 // Update whether custom warning is shown when different page options are selected.

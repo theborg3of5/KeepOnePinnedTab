@@ -1,14 +1,28 @@
-☐ Consider ignoring tabs in collapsed groups when counting how many tabs besides our special pinned one there are
+✔ Consider ignoring tabs in collapsed groups when counting how many tabs besides our special pinned one there are @done(24-01-06 16:31)
 	Goal: similar behavior with collapsed tab group, as when those tabs don't exist
-	☐ This will require the "tabGroups" permission > requires me to move to manifest v3 > requires switching from a background page to a service worker
-	☐ Code bits
-		☐ Tab.groupId - ID of group tab is in, or chrome.tabGroups.TAB_GROUP_ID_NONE (-1) if it's not in a group
-		☐ var groupId = targetWindow.tabs[1].groupId;
-		☐ var group = chrome.tabGroups.get(groupId);
-		☐ console.log(group.collapsed);
-	☐ Also skip over it when deciding which tab to focus (to unfocus pinned tab)
+	✔ This will require the "tabGroups" permission > requires me to move to manifest v3 > requires switching from a background page to a service worker @done(24-01-06 16:31)
+	✔ Code bits @done(24-01-06 16:31)
+		Tab.groupId - ID of group tab is in, or chrome.tabGroups.TAB_GROUP_ID_NONE (-1) if it's not in a group
+		var groupId = targetWindow.tabs[1].groupId;
+		var group = chrome.tabGroups.get(groupId);
+		console.log(group.collapsed);
+	✔ Also skip over it when deciding which tab to focus (to unfocus pinned tab) @done(24-01-06 16:31)
 ☐ Make tab URL filter a little less granular?
 	Already just checks the beginning (I think)
 	☐ Make http vs https not matter?
 		Might need a setting in this case, though - maybe an "exact match" checkbox?
 ☐ Consider new setting for ignoring all pinned tabs in counting - so "keep one non-pinned tab open".
+New plan for options:
+	☐ All keys move into constant objects (like SettingsKeys) which are then shared via chrome.storage.session.get/set
+	Settings page gets revamped:
+		Pinned page choice:	
+			☐ Now it's just a field with buttons that prefill values
+			☐ Maybe bold the currently "selected" button (the one whose value matches the current URL's value)?
+			☐ Stop loading/saving specific values for the "page" vs. the "custom URL" - how it's just 1 value, the "pinned URL"
+				This will require some conversion logic in the service worker:
+					☐ Create a helper function to convert back to old keys for testing against
+					☐ Check for the old settings keys. If found:
+						☐ Calculate the corresponding pinned URL (basically what calculatePinnedURL already is)
+						☐ Store the new pinned URL value in sync storage
+						☐ Delete the old settings keys from sync storage (assuming that's a thing I can do?)
+		☐ Never focus pinned tab checkbox - keep it, but consider rewording slightly

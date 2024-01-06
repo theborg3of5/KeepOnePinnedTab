@@ -1,10 +1,20 @@
 ﻿// #region Constants
+
+const SettingKeys = {
+	PinnedURL: 		"KeepOnePinnedTab_PinnedURL",
+	NoFocusTab: 	"KeepOnePinnedTab_NoFocusPinnedTab",
+	PinnedTabPage: 	"KeepOnePinnedTab_PinnedTabPage",
+	CustomURL:		"KeepOnePinnedTab_CustomPinnedTabURL",
+};
+chrome.storage.session.set({"testyglobaly": ["duuude", "ope"]});
+
 // GDB TODO figure out how to share these with the options page.
 // Options for which sort of pinned tab we keep.
 const PinnedTabPage_Default    = "Default";
 const PinnedTabPage_BlankLight = "BlankLight";
 const PinnedTabPage_BlankDark  = "BlankDark";
-const PinnedTabPage_Custom     = "Custom";
+const PinnedTabPage_Custom = "Custom";
+
 
 // Keys that we use to index into the sync storage.
 const KOPT_NoFocusTab = "KeepOnePinnedTab_NoFocusPinnedTab";
@@ -197,7 +207,6 @@ async function keepNeededTabs(targetWindowId)
 	// tab will close if the user tries to close that tab). Ignore tabs collapsed in a group so we're not
 	// forcing those groups to uncollapse if we're unfocusing the pinned tab.
 	const visibleTabs = await getVisibleTabs(targetWindow);
-	console.log(visibleTabs);
 	if (visibleTabs.length < 2)
 	{ 
 		chrome.tabs.create({
@@ -445,6 +454,11 @@ async function getPinnedURL() {
 		)
 	});
 }
+
+// GDB TODO could I just do these like this instead?
+/*
+const val = await chrome.storage.session.get("testyglobaly");
+*/
 
 /**
  * Figure out what the pinned tab URL should be based on the give sync settings.
