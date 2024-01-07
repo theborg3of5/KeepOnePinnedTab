@@ -7,6 +7,10 @@
 				vertical-align: middle;
 			}
 
+			.pinnedURLPresetButton {
+				margin-right: 5px;
+			}
+
 			.selectedButton {
 				font-weight: bold;
 			}
@@ -16,15 +20,12 @@
 	<body>
 		<label title="This will be the first pinned tab in each window">
 			<p style="margin-bottom: 5px; font-weight: 600;">URL to keep pinned at all times:</p>
-			
 			<input type="text" id="inptPinnedURL" style="margin-bottom: 5px; width: 600px;" />
-			
-			<br />
-			Presets:
-			<button pinnedURLPreset id="btnPresetDefault">Default</button>
-			<button pinnedURLPreset id="btnPresetBlankLight">Blank Light</button>
-			<button pinnedURLPreset id="btnPresetBlankDark">Blank Dark</button>
 		</label>
+			
+		<br />
+		Presets:
+		<span id="spnPresetButtons"></span>
 
 		<br /><br />
 		<label title="If this is checked and you try to focus the special pinned tab, we will immediately switch to the next tab instead.">
@@ -33,9 +34,7 @@
 		
 		<br /><br />
 		<button id="btnSave">Save</button>
-		
-		<br /><br />
-		<div id="status"></div>
+		<span id="divStatus"></span>
 	</body>
 	
 	<script src="options.js"></script>

@@ -1,6 +1,12 @@
 ﻿// GDB TODO probably remove the "open_in_tab" from the manifest once everything is working happily again
-// Setting key constants (populated in populateSettingKeys)
+
+// #region Globals
+// Setting key constants
 let SettingKeys = {};
+
+// Mapping from URL to preset button ID (used to bold the matching button)
+const urlToPresetButtonMap = {};
+// #endregion Globals
 
 // #region Event handlers
 // Page load
@@ -8,40 +14,46 @@ document.addEventListener('DOMContentLoaded', async () =>
 {
 	await populateSettingKeys();
 	await loadOptions();
+	
+	// Add (and add click handlers to) pinned URL preset buttons
+	addPresetButton("btnPresetDefault", "Default", "chrome://newtab/");
+	addPresetButton("btnPresetBlankLight", "Blank Light", chrome.runtime.getURL("Resources/blankLight.html"));
+	addPresetButton("btnPresetBlankDark", "Blank Dark", chrome.runtime.getURL("Resources/blankDark.html"));
+	boldSelectedButton();
 });
 // Save button click
 document.querySelector("#btnSave").addEventListener("click", saveOptions);
 
-// Pinned URL button clicks
-document.querySelector("#btnPresetDefault").addEventListener("click", () => { presetButtonClicked("chrome://newtab/") });
-document.querySelector("#btnPresetBlankLight").addEventListener("click", () => { presetButtonClicked(chrome.runtime.getURL("Resources/blankLight.html")) });
-document.querySelector("#btnPresetBlankDark").addEventListener("click", () => { presetButtonClicked(chrome.runtime.getURL("Resources/blankDark.html")) });
-
-// User changing pinned URL field value (doesn't fire when a button is clicked, so we trigger it manually in that case).
+// User changing pinned URL field value (preset buttons don't fire this).
 document.querySelector("#inptPinnedURL").addEventListener("input", boldSelectedButton);
 // #endregion Event handlers
 
-//gdbdoc
+/**
+ * Grab our sync settings keys from the session storage (set by service_worker).
+ */
 async function populateSettingKeys()
 {
 	const settings = await chrome.storage.session.get("SettingKeys");
 	SettingKeys = settings["SettingKeys"];
 }
 
-//gdbdoc
+/**
+ * Load the user's settings from sync storage and populate the fields with them.
+ */
 async function loadOptions()
 {
 	const settings = await chrome.storage.sync.get([SettingKeys.PinnedURL, SettingKeys.NoFocusPinnedTab]);
 	
 	const pinnedURL = settings[SettingKeys.PinnedURL];
 	document.getElementById("inptPinnedURL").value = pinnedURL;
-	boldSelectedButton();
 	
 	const noFocusPinnedTab = settings[SettingKeys.NoFocusPinnedTab];
 	document.getElementById("chkNoFocus").checked = noFocusPinnedTab;
 }
 
-//gdbdoc
+/**
+ * Save the current settings to sync storage.
+ */
 function saveOptions()
 {
 	const pinnedURL = document.getElementById("inptPinnedURL").value;
@@ -52,47 +64,53 @@ function saveOptions()
 		[SettingKeys.PinnedURL]: pinnedURL
 	});
 	
-	var status = document.getElementById("status");
+	// Flash an indicator to let the user know we saved.
+	var status = document.getElementById("divStatus");
 	status.innerHTML = "Options Saved.";
-	setTimeout(
-		function() {
-			status.innerHTML = "";
-		},
-		750
-	);
+	setTimeout(() => { status.innerHTML = ""; }, 750);
 }
 
-//gdbdoc
-function presetButtonClicked(pinnedURL)
-{
-	document.getElementById("inptPinnedURL").value = pinnedURL;
-	boldSelectedButton();
-}
+/**
+ * Generate and add a preset button to the page, including its click handler.
+ * Also adds to urlToPresetButtonMap.
+ * @param {string} id ID for the new button
+ * @param {string} caption Caption for the new button
+ * @param {string} url Pinned URL that we should blow in when this button is clicked
+ */
+function addPresetButton(id, caption, url)
+{ 
+	// Create the button
+	const button = document.createElement("button");
+	button.id = id;
+	button.innerText = caption;
+	button.classList.add("pinnedURLPresetButton");
 
-//gdbdoc
-function boldSelectedButton() { 
-	const newValue = document.querySelector("#inptPinnedURL").value;
-	
-	let buttonId = "";
-	switch (newValue)
-	{
-		case "chrome://newtab/":
-			buttonId = "btnPresetDefault";
-			break;
-		case chrome.runtime.getURL("Resources/blankLight.html"):
-			buttonId = "btnPresetBlankLight"; // GDB TODO at the very least just calculate these URLs the once and store that off somewhere
-			break;
-		case chrome.runtime.getURL("Resources/blankDark.html"):
-			buttonId = "btnPresetBlankDark";
-			break;
-	}
-
-	// Clear any old boldings
-	document.querySelectorAll("button[pinnedURLPreset").forEach(button => {
-		button.classList.remove("selectedButton");
+	// Add click handler
+	button.addEventListener("click", () =>
+	{ 
+		document.getElementById("inptPinnedURL").value = url;
+		boldSelectedButton();
 	});
 
+	// Add to presets container
+	document.querySelector("#spnPresetButtons").appendChild(button);
+
+	// Add URL-to-button-ID mapping
+	urlToPresetButtonMap[url] = id;
+}
+
+/**
+ * Bold the preset button (if any) that matches the current URL in the field.
+ */
+function boldSelectedButton() { 
+	// Clear bold from all buttons
+	document.querySelectorAll("button.pinnedURLPresetButton").forEach(button => {
+		button.classList.remove("selectedButton");
+	});
+	
 	// Bold the new matching button
+	const newURL = document.querySelector("#inptPinnedURL").value;
+	const buttonId = urlToPresetButtonMap[newURL];
 	if (buttonId)
 	{ 
 		const button = document.getElementById(buttonId);
