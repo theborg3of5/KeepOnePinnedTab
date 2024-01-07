@@ -470,8 +470,8 @@ async function convertFromLegacySettings()
 
 	// Save the new setting to storage, and get rid of the old ones.
 	await chrome.storage.sync.set({ [SettingKeys.PinnedURL]: pinnedURL });
-	// await chrome.storage.sync.remove([SettingKeys.PinnedTabPage, SettingKeys.CustomURL]); // gdb revert
-	// await chrome.storage.sync.remove(SettingKeys.LegacyKey); // Can remove soon - this is just to make sure this gets removed as we didn't do that in previous conversions.
+	await chrome.storage.sync.remove([SettingKeys.PinnedTabPage, SettingKeys.CustomURL]);
+	await chrome.storage.sync.remove(SettingKeys.LegacyKey); // Can remove soon - this is just to make sure this gets removed as we didn't do that in previous conversions.
 
 	return true;
 }

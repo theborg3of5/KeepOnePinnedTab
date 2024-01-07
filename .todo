@@ -3,17 +3,3 @@
 	☐ Make http vs https not matter?
 		Might need a setting in this case, though - maybe an "exact match" checkbox?
 ☐ Consider new setting for ignoring all pinned tabs in counting - so "keep one non-pinned tab open".
-✔ New plan for options: @done(24-01-06 22:58)
-	✔ All keys move into constant objects (like SettingsKeys) which are then shared via chrome.storage.session.get/set @done(24-01-06 22:58)
-	Settings page gets revamped:
-		Pinned page choice:	
-			✔ Now it's just a field with buttons that prefill values @done(24-01-06 22:58)
-			✔ Maybe bold the currently "selected" button (the one whose value matches the current URL's value)? @done(24-01-06 22:58)
-			✔ Stop loading/saving specific values for the "page" vs. the "custom URL" - how it's just 1 value, the "pinned URL" @done(24-01-06 22:58)
-				This will require some conversion logic in the service worker:
-					✔ Create a helper function to convert back to old keys for testing against @done(24-01-06 22:58)
-					✔ Check for the old settings keys. If found: @done(24-01-06 22:58)
-						✔ Calculate the corresponding pinned URL (basically what calculatePinnedURL already is) @done(24-01-06 22:58)
-						✔ Store the new pinned URL value in sync storage @done(24-01-06 22:58)
-						✔ Delete the old settings keys from sync storage (assuming that's a thing I can do?) @done(24-01-06 22:58)
-		✔ Never focus pinned tab checkbox - keep it, but consider rewording slightly @done(24-01-06 22:58)
