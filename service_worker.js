@@ -1,26 +1,14 @@
 ﻿// #region Constants
-
 const SettingKeys = {
-	PinnedURL: 		"KeepOnePinnedTab_PinnedURL",
-	NoFocusTab: 	"KeepOnePinnedTab_NoFocusPinnedTab",
-	PinnedTabPage: 	"KeepOnePinnedTab_PinnedTabPage",
-	CustomURL:		"KeepOnePinnedTab_CustomPinnedTabURL",
+	PinnedURL: 			"KeepOnePinnedTab_PinnedURL",
+	NoFocusPinnedTab:	"KeepOnePinnedTab_NoFocusPinnedTab", // GDB TODO call out other old versions of settings, probably rename them with "Legacy" or similar too
+	PinnedTabPage: 		"KeepOnePinnedTab_PinnedTabPage",
+	CustomURL:			"KeepOnePinnedTab_CustomPinnedTabURL",
+	LegacyKey:			"KeepOnePinnedTab_NewTabPage", // Really old version of settings, only exists here for a little longer to make sure we clean it out of sync storage.
 };
-chrome.storage.session.set({"testyglobaly": ["duuude", "ope"]});
 
-// GDB TODO figure out how to share these with the options page.
-// Options for which sort of pinned tab we keep.
-const PinnedTabPage_Default    = "Default";
-const PinnedTabPage_BlankLight = "BlankLight";
-const PinnedTabPage_BlankDark  = "BlankDark";
-const PinnedTabPage_Custom = "Custom";
-
-
-// Keys that we use to index into the sync storage.
-const KOPT_NoFocusTab = "KeepOnePinnedTab_NoFocusPinnedTab";
-const KOPT_Page       = "KeepOnePinnedTab_PinnedTabPage";
-const KOPT_CustomURL = "KeepOnePinnedTab_CustomPinnedTabURL";
-const KOPT_PinnedURL = "KeepOnePinnedTab_PinnedURL";
+// Stick these into session storage so the settings can grab them too.
+chrome.storage.session.set({ "SettingKeys": SettingKeys });
 // #endregion Constants
 
 // #region Event Listeners
@@ -116,10 +104,10 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
 chrome.storage.onChanged.addListener((changes) =>
 {
 	// Only need to worry about updating things if something about the pinned tab URL changed.
-	if (!changes[KOPT_PinnedURL])
+	if (!changes[SettingKeys.PinnedURL])
 		return;
 
-	const { oldValue, newValue } = changes[KOPT_PinnedURL]; // GDB TODO finish converting everything over (conversion and the like) to new simplified settings node
+	const { oldValue, newValue } = changes[SettingKeys.PinnedURL];
 	const oldPinnedURL = oldValue;
 	const newPinnedURL = newValue;
 
@@ -222,9 +210,10 @@ async function keepNeededTabs(targetWindowId)
  * @param {string} urlToCheck The URL the tab should have
  * @returns true/false - is the given tab our special pinned one?
  */
-function isSpecialPinnedTab(tab, urlToCheck) {
-	if (urlToCheck == "")
-		return false;
+function isSpecialPinnedTab(tab, urlToCheck)
+{
+	if (!urlToCheck)
+		return true; // Treat no URL at all (which really shouldn't happen) as if it's our special tab to avoid infinite tab creation.
 	if(!tab || (tab == undefined) )
 		return false;
 	if(!tab.pinned)
@@ -428,56 +417,73 @@ async function getGroup(groupId)
  */
 async function shouldBlockPinnedTabFocus()
 {
-	return new Promise(
-		(resolve) =>
-		{
-			chrome.storage.sync.get(KOPT_NoFocusTab,
-				(settings) =>
-				{
-					resolve(settings[KOPT_NoFocusTab] ?? false);
-				}
-			)
-		}
-	);
+	return getSingleSyncSetting(SettingKeys.NoFocusPinnedTab);
 }
 
 /**
- * Get the URL we should use for our special pinned tab.
- * @returns Promise that resolves into the URL we should use for our pinned tab.
+ * Get the URL we should use for our special pinned tab, handling older settings and a default value.
+ * @returns The URL we should use for our pinned tab.
  */
-async function getPinnedURL() {
-	return new Promise((resolve, reject) =>	{
-		chrome.storage.sync.get([KOPT_Page, KOPT_CustomURL],
-			(settings) => {
-				resolve(calculatePinnedURL(settings));
-			}
-		)
-	});
+async function getPinnedURL()
+{
+	// First, see if it's already populated.
+	let pinnedURL = await getSingleSyncSetting(SettingKeys.PinnedURL);
+	if (pinnedURL) // Setting populated, good to go!
+		return pinnedURL;
+
+	// Next, try generating it from the older version of our settings.
+	if (await convertFromLegacySettings())
+		return await getSingleSyncSetting(SettingKeys.PinnedURL); // Settings should have been updated by the conversion.
+	
+	// Finally, fall back to our default.
+	return "chrome://newtab/";
 }
 
-// GDB TODO could I just do these like this instead?
-/*
-const val = await chrome.storage.session.get("testyglobaly");
-*/
+// gdbdoc
+async function convertFromLegacySettings()
+{
+	const settings = await chrome.storage.sync.get([SettingKeys.PinnedTabPage, SettingKeys.CustomURL]);
+	if (!settings[SettingKeys.PinnedTabPage] && !settings[SettingKeys.CustomURL])
+		return false; // Nothing stored at all, probably a brand-new installation.
 
-/**
- * Figure out what the pinned tab URL should be based on the give sync settings.
- * @param {object} settings Sync storage object with the KOPT_Page and KOPT_CustomURL items on it.
- * @returns The URL to use for our pinned tab.
- */
-function calculatePinnedURL(settings) {
-	switch (settings[KOPT_Page])
+	// Determine simple URL from the previous combination of settings.
+	let pinnedURL = "";
+	switch (settings[SettingKeys.PinnedTabPage])
 	{
-		case PinnedTabPage_BlankLight:
-			return chrome.runtime.getURL("Resources/blankLight.html");
-		case PinnedTabPage_BlankDark:
-			return chrome.runtime.getURL("Resources/blankDark.html");
-		case PinnedTabPage_Custom:
-			return settings[KOPT_CustomURL];
-		case PinnedTabPage_Default:
-		default:
-			return "chrome://newtab/";
+		case "Default":
+			pinnedURL = "chrome://newtab/";
+			break;
+		case "BlankLight":
+			pinnedURL = chrome.runtime.getURL("Resources/blankLight.html");
+			break;
+		case "BlankDark":
+			pinnedURL = chrome.runtime.getURL("Resources/blankDark.html");
+			break;
+		case "Custom":
+			pinnedURL = settings[SettingKeys.CustomURL];
+			break;
 	}
+
+	// Something went wrong, don't touch the settings and use the default value instead.
+	if (!pinnedURL)
+		return false;
+
+	// Save the new setting to storage, and get rid of the old ones.
+	await chrome.storage.sync.set({ [SettingKeys.PinnedURL]: pinnedURL });
+	// await chrome.storage.sync.remove([SettingKeys.PinnedTabPage, SettingKeys.CustomURL]); // gdb revert
+	// await chrome.storage.sync.remove(SettingKeys.LegacyKey); // Can remove soon - this is just to make sure this gets removed as we didn't do that in previous conversions.
+
+	return true;
+}
+
+// gdbdoc
+async function getSingleSyncSetting(settingKey)
+{
+	if (settingKey == "")
+		return null;
+
+	const settings = await chrome.storage.sync.get(settingKey);
+	return settings[settingKey];
 }
 // #endregion Settings getters
 

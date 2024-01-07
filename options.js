@@ -1,75 +1,56 @@
-﻿let KOPT = {};
+﻿// GDB TODO probably remove the "open_in_tab" from the manifest once everything is working happily again
+// Setting key constants (populated in populateSettingKeys)
+let SettingKeys = {};
 
+// #region Event handlers
+// Page load
 document.addEventListener('DOMContentLoaded', async () =>
 {
-	const val = (await chrome.storage.session.get("testyglobaly"))["testyglobaly"];
-	console.log(val);
-	KOPT.asdf = "ooh!"
+	await populateSettingKeys();
+	await loadOptions();
 });
+// Save button click
+document.querySelector("#btnSave").addEventListener("click", saveOptions);
 
-// GDB TODO consider adding listeners directly for load/save like they do here: https://developer.chrome.com/docs/extensions/develop/ui/options-page
-// GDB TODO probably remove the "open_in_tab" from the manifest once everything is working happily again
+// Pinned URL button clicks
+document.querySelector("#btnPresetDefault").addEventListener("click", () => { presetButtonClicked("chrome://newtab/") });
+document.querySelector("#btnPresetBlankLight").addEventListener("click", () => { presetButtonClicked(chrome.runtime.getURL("Resources/blankLight.html")) });
+document.querySelector("#btnPresetBlankDark").addEventListener("click", () => { presetButtonClicked(chrome.runtime.getURL("Resources/blankDark.html")) });
 
-function loadOptions() {
-	chrome.storage.sync.get(
-		[
-			KOPT_NoFocusTab,
-			KOPT_Page,
-			KOPT_CustomURL,
-		],
-		function(items) {
-			var noFocusPinnedTab = items[KOPT_NoFocusTab]
-			var pinnedTabPage    = items[KOPT_Page];
-			var customURL        = items[KOPT_CustomURL];
-			
-			document.getElementById("NoFocusPinnedTab").checked = noFocusPinnedTab;
-			
-			if(!pinnedTabPage) // Default if not set
-				pinnedTabPage = PinnedTabPage_Default;
-			var optionElement = document.querySelector(".PinnedTabPage[value=" + pinnedTabPage + "]");
-			if(optionElement)
-				optionElement.checked = true;
-			
-			if(pinnedTabPage == PinnedTabPage_Custom)
-				document.getElementById("customURL").value = customURL;
-			
-			updateCustomWarning(pinnedTabPage);
-		}
-	);
+// User changing pinned URL field value (doesn't fire when a button is clicked, so we trigger it manually in that case).
+document.querySelector("#inptPinnedURL").addEventListener("input", boldSelectedButton);
+// #endregion Event handlers
+
+//gdbdoc
+async function populateSettingKeys()
+{
+	const settings = await chrome.storage.session.get("SettingKeys");
+	SettingKeys = settings["SettingKeys"];
 }
 
-function calculatePinnedURL(page, customURL) { // GDB TODO try to pull this from a central spot instead of copying it here
-	switch (page)
-	{
-		case PinnedTabPage_BlankLight:
-			return chrome.runtime.getURL("Resources/blankLight.html");
-		case PinnedTabPage_BlankDark:
-			return chrome.runtime.getURL("Resources/blankDark.html");
-		case PinnedTabPage_Custom:
-			return customURL;
-		case PinnedTabPage_Default:
-		default:
-			return "chrome://newtab/";
-	}
+//gdbdoc
+async function loadOptions()
+{
+	const settings = await chrome.storage.sync.get([SettingKeys.PinnedURL, SettingKeys.NoFocusPinnedTab]);
+	
+	const pinnedURL = settings[SettingKeys.PinnedURL];
+	document.getElementById("inptPinnedURL").value = pinnedURL;
+	boldSelectedButton();
+	
+	const noFocusPinnedTab = settings[SettingKeys.NoFocusPinnedTab];
+	document.getElementById("chkNoFocus").checked = noFocusPinnedTab;
 }
 
-function saveOptions() {
-	var customURL;
-	
-	var noFocusPinnedTab = document.getElementById("NoFocusPinnedTab").checked;
-	
-	var pinnedTabPage = document.querySelector("input[name=PinnedTabPage]:checked").value;
-	if(pinnedTabPage == PinnedTabPage_Custom)
-		customURL = document.querySelector("#customURL").value;
-	
-	chrome.storage.sync.set(
-		{
-			[KOPT_NoFocusTab]: noFocusPinnedTab,
-			[KOPT_Page]:       pinnedTabPage,
-			[KOPT_CustomURL]: customURL,
-			[KOPT_PinnedURL]: calculatePinnedURL(pinnedTabPage, customURL) // GDB TODO probably switch to just having this value (though I'll need some sort of legacy conversion handling to switch over)
-		}
-	);
+//gdbdoc
+function saveOptions()
+{
+	const pinnedURL = document.getElementById("inptPinnedURL").value;
+	const noFocusPinnedTab = document.getElementById("chkNoFocus").checked;
+
+	chrome.storage.sync.set({
+		[SettingKeys.NoFocusPinnedTab]: noFocusPinnedTab,
+		[SettingKeys.PinnedURL]: pinnedURL
+	});
 	
 	var status = document.getElementById("status");
 	status.innerHTML = "Options Saved.";
@@ -81,22 +62,43 @@ function saveOptions() {
 	);
 }
 
-function updateCustomWarningEvent(e) {
-	updateCustomWarning(e.target.value);
-}
-function updateCustomWarning(pinnedTabPage) {
-	if(pinnedTabPage == PinnedTabPage_Custom)
-		document.getElementById("customWarning").style.display = "inline";
-	else
-		document.getElementById("customWarning").style.display = "none";
+//gdbdoc
+function presetButtonClicked(pinnedURL)
+{
+	document.getElementById("inptPinnedURL").value = pinnedURL;
+	boldSelectedButton();
 }
 
+//gdbdoc
+function boldSelectedButton() { 
+	const newValue = document.querySelector("#inptPinnedURL").value;
+	
+	let buttonId = "";
+	switch (newValue)
+	{
+		case "chrome://newtab/":
+			buttonId = "btnPresetDefault";
+			break;
+		case chrome.runtime.getURL("Resources/blankLight.html"):
+			buttonId = "btnPresetBlankLight"; // GDB TODO at the very least just calculate these URLs the once and store that off somewhere
+			break;
+		case chrome.runtime.getURL("Resources/blankDark.html"):
+			buttonId = "btnPresetBlankDark";
+			break;
+	}
 
-// Add the events to load/save from this page.
-document.addEventListener("DOMContentLoaded", loadOptions); // GDB TODO consider embedding these with () => {} stuff
-document.querySelector("#save").addEventListener("click", saveOptions);
+	// Clear any old boldings
+	document.querySelectorAll("button[pinnedURLPreset").forEach(button => {
+		button.classList.remove("selectedButton");
+	});
 
-// Update whether custom warning is shown when different page options are selected.
-var pinnedTabPageInputs = document.querySelectorAll(".PinnedTabPage")
-for(var i = 0; i < pinnedTabPageInputs.length; i++)
-	pinnedTabPageInputs[i].addEventListener("change", updateCustomWarningEvent);
+	// Bold the new matching button
+	if (buttonId)
+	{ 
+		const button = document.getElementById(buttonId);
+		if (button)
+		{ 
+			button.classList.add("selectedButton");
+		}
+	}
+};
