@@ -1,75 +1,121 @@
-﻿
-function loadOptions() {
-	chrome.storage.sync.get(
-		[
-			KOPT_NoFocusTab,
-			KOPT_Page,
-			KOPT_CustomURL,
-		],
-		function(items) {
-			var noFocusPinnedTab = items[KOPT_NoFocusTab]
-			var pinnedTabPage    = items[KOPT_Page];
-			var customURL        = items[KOPT_CustomURL];
-			
-			document.getElementById("NoFocusPinnedTab").checked = noFocusPinnedTab;
-			
-			if(!pinnedTabPage) // Default if not set
-				pinnedTabPage = PinnedTabPage_Default;
-			var optionElement = document.querySelector(".PinnedTabPage[value=" + pinnedTabPage + "]");
-			if(optionElement)
-				optionElement.checked = true;
-			
-			if(pinnedTabPage == PinnedTabPage_Custom)
-				document.getElementById("customURL").value = customURL;
-			
-			updateCustomWarning(pinnedTabPage);
-		}
-	);
+﻿// #region Globals
+// Setting key constants
+let SettingKeys = {};
+
+// Mapping from URL to preset button ID (used to bold the matching button)
+const urlToPresetButtonMap = {};
+// #endregion Globals
+
+// #region Event handlers
+// Page load
+document.addEventListener('DOMContentLoaded', async () =>
+{
+	await populateSettingKeys();
+	await loadOptions();
+	
+	// Add (and add click handlers to) pinned URL preset buttons
+	addPresetButton("btnPresetDefault", "Default", "chrome://newtab/");
+	addPresetButton("btnPresetBlankLight", "Blank Light", chrome.runtime.getURL("Resources/blankLight.html"));
+	addPresetButton("btnPresetBlankDark", "Blank Dark", chrome.runtime.getURL("Resources/blankDark.html"));
+	boldSelectedButton();
+});
+// Save button click
+document.querySelector("#btnSave").addEventListener("click", saveOptions);
+
+// User changing pinned URL field value (preset buttons don't fire this).
+document.querySelector("#inptPinnedURL").addEventListener("input", boldSelectedButton);
+// #endregion Event handlers
+
+
+/**
+ * Grab our sync settings keys from the session storage (set by service_worker).
+ */
+async function populateSettingKeys()
+{
+	const settings = await chrome.storage.session.get("SettingKeys");
+	SettingKeys = settings["SettingKeys"];
 }
 
-function saveOptions() {
-	var customURL;
+/**
+ * Load the user's settings from sync storage and populate the fields with them.
+ */
+async function loadOptions()
+{
+	const settings = await chrome.storage.sync.get([SettingKeys.PinnedURL, SettingKeys.NoFocusPinnedTab]);
 	
-	var noFocusPinnedTab = document.getElementById("NoFocusPinnedTab").checked;
+	const pinnedURL = settings[SettingKeys.PinnedURL];
+	document.getElementById("inptPinnedURL").value = pinnedURL;
 	
-	var pinnedTabPage = document.querySelector("input[name=PinnedTabPage]:checked").value;
-	if(pinnedTabPage == PinnedTabPage_Custom)
-		customURL = document.querySelector("#customURL").value;
+	const noFocusPinnedTab = settings[SettingKeys.NoFocusPinnedTab];
+	document.getElementById("chkNoFocus").checked = noFocusPinnedTab;
+}
+
+/**
+ * Save the current settings to sync storage.
+ */
+function saveOptions()
+{
+	const pinnedURL = document.getElementById("inptPinnedURL").value;
+	const noFocusPinnedTab = document.getElementById("chkNoFocus").checked;
+
+	chrome.storage.sync.set({
+		[SettingKeys.NoFocusPinnedTab]: noFocusPinnedTab,
+		[SettingKeys.PinnedURL]: pinnedURL
+	});
 	
-	chrome.storage.sync.set(
-		{
-			[KOPT_NoFocusTab]: noFocusPinnedTab,
-			[KOPT_Page]:       pinnedTabPage,
-			[KOPT_CustomURL]:  customURL
-		}
-	);
-	
-	var status = document.getElementById("status");
+	// Flash an indicator to let the user know we saved.
+	var status = document.getElementById("divStatus");
 	status.innerHTML = "Options Saved.";
-	setTimeout(
-		function() {
-			status.innerHTML = "";
-		},
-		750
-	);
+	setTimeout(() => { status.innerHTML = ""; }, 750);
 }
 
-function updateCustomWarningEvent(e) {
-	updateCustomWarning(e.target.value);
+/**
+ * Generate and add a preset button to the page, including its click handler.
+ * Also adds to urlToPresetButtonMap.
+ * @param {string} id ID for the new button
+ * @param {string} caption Caption for the new button
+ * @param {string} url Pinned URL that we should blow in when this button is clicked
+ */
+function addPresetButton(id, caption, url)
+{ 
+	// Create the button
+	const button = document.createElement("button");
+	button.id = id;
+	button.innerText = caption;
+	button.classList.add("pinnedURLPresetButton");
+
+	// Add click handler
+	button.addEventListener("click", () =>
+	{ 
+		document.getElementById("inptPinnedURL").value = url;
+		boldSelectedButton();
+	});
+
+	// Add to presets container
+	document.querySelector("#spnPresetButtons").appendChild(button);
+
+	// Add URL-to-button-ID mapping
+	urlToPresetButtonMap[url] = id;
 }
-function updateCustomWarning(pinnedTabPage) {
-	if(pinnedTabPage == PinnedTabPage_Custom)
-		document.getElementById("customWarning").style.display = "inline";
-	else
-		document.getElementById("customWarning").style.display = "none";
-}
 
-
-// Add the events to load/save from this page.
-document.addEventListener("DOMContentLoaded", loadOptions);
-document.querySelector("#save").addEventListener("click", saveOptions);
-
-// Update whether custom warning is shown when different page options are selected.
-var pinnedTabPageInputs = document.querySelectorAll(".PinnedTabPage")
-for(var i = 0; i < pinnedTabPageInputs.length; i++)
-	pinnedTabPageInputs[i].addEventListener("change", updateCustomWarningEvent);
+/**
+ * Bold the preset button (if any) that matches the current URL in the field.
+ */
+function boldSelectedButton() { 
+	// Clear bold from all buttons
+	document.querySelectorAll("button.pinnedURLPresetButton").forEach(button => {
+		button.classList.remove("selectedButton");
+	});
+	
+	// Bold the new matching button
+	const newURL = document.querySelector("#inptPinnedURL").value;
+	const buttonId = urlToPresetButtonMap[newURL];
+	if (buttonId)
+	{ 
+		const button = document.getElementById(buttonId);
+		if (button)
+		{ 
+			button.classList.add("selectedButton");
+		}
+	}
+};

@@ -35,3 +35,6 @@ Changelog:
   - Don't open two new tabs (+ pinned one) when opening a new window.
   - Work correctly in incognito mode.
 4.2: Fix issue where we keep opening new pinned tabs when Chrome is allowed to stay open in the background
+5.0: Complete rewrite and upgrade to manifest v3!
+  - Fixes the "never focus pinned tab" setting.
+  - Cleans up the settings page (and changes how we store settings behind the scenes).
