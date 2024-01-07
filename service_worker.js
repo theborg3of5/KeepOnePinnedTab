@@ -1,13 +1,15 @@
 ﻿// #region Constants
 const SettingKeys = {
 	PinnedURL: 			"KeepOnePinnedTab_PinnedURL",
-	NoFocusPinnedTab:	"KeepOnePinnedTab_NoFocusPinnedTab", // GDB TODO call out other old versions of settings, probably rename them with "Legacy" or similar too
-	PinnedTabPage: 		"KeepOnePinnedTab_PinnedTabPage",
-	CustomURL:			"KeepOnePinnedTab_CustomPinnedTabURL",
-	LegacyKey:			"KeepOnePinnedTab_NewTabPage", // Really old version of settings, only exists here for a little longer to make sure we clean it out of sync storage.
+	NoFocusPinnedTab:	"KeepOnePinnedTab_NoFocusPinnedTab",
+	
+	// These are keys that were used only by older ways of storing our settings - they can be removed in a while.
+	PinnedTabPage:	"KeepOnePinnedTab_PinnedTabPage",
+	CustomURL:		"KeepOnePinnedTab_CustomPinnedTabURL",
+	LegacyKey:		"KeepOnePinnedTab_NewTabPage",
 };
 
-// Stick these into session storage so the settings can grab them too.
+// Stick these keys into session storage so the settings can grab them too.
 chrome.storage.session.set({ "SettingKeys": SettingKeys });
 // #endregion Constants
 
@@ -349,6 +351,7 @@ async function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
 	);
 }
 
+
 // #region Chrome object getters
 /**
  * Convenience wrapper for getting a window that handles bad (generally just-closed) window IDs without 
@@ -439,7 +442,11 @@ async function getPinnedURL()
 	return "chrome://newtab/";
 }
 
-// gdbdoc
+/**
+ * Try to convert older versions of our settings (where page and custom URL were stored separately) 
+ * to our new one (where the URL is a single setting).
+ * @returns true if we successfully converted old settings to new ones, false otherwise.
+ */
 async function convertFromLegacySettings()
 {
 	const settings = await chrome.storage.sync.get([SettingKeys.PinnedTabPage, SettingKeys.CustomURL]);
@@ -476,7 +483,11 @@ async function convertFromLegacySettings()
 	return true;
 }
 
-// gdbdoc
+/**
+ * Convenience wrapper that just retrieves a single setting from sync storage.
+ * @param {string} settingKey Sync key for the setting you want.
+ * @returns Value for the requested setting
+ */
 async function getSingleSyncSetting(settingKey)
 {
 	if (settingKey == "")

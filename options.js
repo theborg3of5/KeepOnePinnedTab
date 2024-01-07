@@ -1,6 +1,4 @@
-﻿// GDB TODO probably remove the "open_in_tab" from the manifest once everything is working happily again
-
-// #region Globals
+﻿// #region Globals
 // Setting key constants
 let SettingKeys = {};
 
@@ -27,6 +25,7 @@ document.querySelector("#btnSave").addEventListener("click", saveOptions);
 // User changing pinned URL field value (preset buttons don't fire this).
 document.querySelector("#inptPinnedURL").addEventListener("input", boldSelectedButton);
 // #endregion Event handlers
+
 
 /**
  * Grab our sync settings keys from the session storage (set by service_worker).
