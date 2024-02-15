@@ -64,7 +64,7 @@ function saveOptions()
 	});
 	
 	// Flash an indicator to let the user know we saved.
-	var status = document.getElementById("divStatus");
+	const status = document.getElementById("divStatus");
 	status.innerHTML = "Options Saved.";
 	setTimeout(() => { status.innerHTML = ""; }, 750);
 }

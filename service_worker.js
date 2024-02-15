@@ -17,7 +17,7 @@ chrome.storage.session.set({ "SettingKeys": SettingKeys });
 /**
  * Whenever a new tab is created, make sure its window has all of the tabs we need.
  * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onCreated
- * @param {Tab} Tab that was created.
+ * @param {Tab} tab The tab that was created.
  */
 chrome.tabs.onCreated.addListener((tab) =>
 {
@@ -103,7 +103,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
  * https://developer.chrome.com/docs/extensions/reference/api/storage#event-onChanged
  * @param {object} changes Contains all changed keys with oldValue/newValue inside.
  */
-chrome.storage.onChanged.addListener((changes) =>
+chrome.storage.onChanged.addListener(async (changes) =>
 {
 	// Only need to worry about updating things if something about the pinned tab URL changed.
 	if (!changes[SettingKeys.PinnedURL])
@@ -113,17 +113,10 @@ chrome.storage.onChanged.addListener((changes) =>
 	const oldPinnedURL = oldValue;
 	const newPinnedURL = newValue;
 
-	chrome.windows.getAll(
-		{
-			"populate":    true, 
-			"windowTypes": ["normal"]
-		},
-		function(windows){
-			for(var i = 0; i < windows.length; i++) {
-				convertWindow(windows[i], oldPinnedURL, newPinnedURL);
-			}
-		}
-	);
+	const windows = await chrome.windows.getAll({ "populate": true, "windowTypes": ["normal"] });
+	for (const window of windows) {
+		convertWindow(window, oldPinnedURL, newPinnedURL);
+	}
 });
 
 /** 
@@ -339,7 +332,7 @@ async function tryFocusTab(tabId, retriesToAllow = 0, retriesSoFar = 0) {
  * @param {string} newPinnedURL The URL that we now want to use for our special pinned tabs
  */
 async function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
-	var firstTab = targetWindow.tabs[0];
+	const firstTab = targetWindow.tabs[0];
 	if(!isSpecialPinnedTab(firstTab, oldPinnedURL))
 		return;
 	
