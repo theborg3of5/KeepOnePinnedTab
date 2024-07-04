@@ -2,12 +2,14 @@
 const SettingKeys = {
 	PinnedURL: 			"KeepOnePinnedTab_PinnedURL",
 	NoFocusPinnedTab:	"KeepOnePinnedTab_NoFocusPinnedTab",
-	
+
 	// These are keys that were used only by older ways of storing our settings - they can be removed in a while.
 	PinnedTabPage:	"KeepOnePinnedTab_PinnedTabPage",
 	CustomURL:		"KeepOnePinnedTab_CustomPinnedTabURL",
 	LegacyKey:		"KeepOnePinnedTab_NewTabPage",
 };
+
+let lastTabId = -1
 
 // Stick these keys into session storage so the settings can grab them too.
 chrome.storage.session.set({ "SettingKeys": SettingKeys });
@@ -24,6 +26,11 @@ chrome.tabs.onCreated.addListener((tab) =>
 	keepNeededTabs(tab.windowId);
 });
 
+chrome.tabs.onUpdated.addListener((tab) =>
+{
+	console.log(tab)
+})
+
 /**
  * Whenever a tab is closed, make sure its window has all of the tabs we need.
  * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onRemoved
@@ -32,17 +39,17 @@ chrome.tabs.onCreated.addListener((tab) =>
  * 						.windowId        - ID of the window that the closed tab was in
  * 						.isWindowClosing - true if the entire window is closing
  */
-chrome.tabs.onRemoved.addListener((_tabId, removeInfo) => 
+chrome.tabs.onRemoved.addListener((_tabId, removeInfo) =>
 {
 	// If the window is closing (as in the user is trying to close the whole window) then just let it happen.
 	if (removeInfo.isWindowClosing)
 		return;
-	
+
 	keepNeededTabs(removeInfo.windowId);
 });
 
 /**
- * When a tab is detached from a window, check that window - if all that's left 
+ * When a tab is detached from a window, check that window - if all that's left
  * is our special pinned tab, close it to avoid leaving behind a useless window.
  * https://developer.chrome.com/docs/extensions/reference/api/tabs#event-onDetached
  * @param {number} tabId ID of the tab that was detached (not used)
@@ -54,12 +61,12 @@ chrome.tabs.onDetached.addListener(async (tabId, detachInfo) =>
 	const detachedWindow = await getWindow(detachInfo.oldWindowId);
 	if (!detachedWindow)
 		return;
-	
+
 	if (detachedWindow.tabs.length != 1) // Window has other tabs
 		return;
 	if (!isSpecialPinnedTab(detachedWindow.tabs[0], await getPinnedURL())) // Not our special pinned tab
 		return;
-	
+
 	try
 	{
 		chrome.windows.remove(detachedWindow.id);
@@ -67,7 +74,7 @@ chrome.tabs.onDetached.addListener(async (tabId, detachInfo) =>
 	catch (error)
 	{
 		// The above sometimes fails on attaching a new tab to an existing window, because onDetached fires
-		// on attaching (because it's getting detached from its temporary window, I guess?) - but we don't 
+		// on attaching (because it's getting detached from its temporary window, I guess?) - but we don't
 		// care because that temporary window is already closed (which was our goal).
 		console.log(error);
 	}
@@ -80,21 +87,22 @@ chrome.tabs.onDetached.addListener(async (tabId, detachInfo) =>
  * 			.tabId - ID of the activated tab
  */
 chrome.tabs.onActivated.addListener(async (activeInfo) =>
-{ 
+{
 	// We only care about activations if we're trying to block activation of our pinned tab.
 	if (!await shouldBlockPinnedTabFocus())
 		return;
-	
 	const activeTab = await chrome.tabs.get(activeInfo.tabId);
 	if (!activeTab || (activeTab == undefined))
 		return;
 	if (!activeTab.active) // Not active anymore
 		return;
-	if (activeTab.index !== 0) // Not the first tab
+	if (activeTab.index !== 0) { // Not the first tab
+		lastTabId = activeInfo.tabId;
 		return;
+	}
 	if (!isSpecialPinnedTab(activeTab, await getPinnedURL())) // Not our special pinned tab
 		return;
-	
+
 	await unfocusTab(activeTab);
 });
 
@@ -119,9 +127,9 @@ chrome.storage.onChanged.addListener(async (changes) =>
 	}
 });
 
-/** 
- * Every .05m (3s), make sure all windows have the tabs they need 
- * (handles stuff like detached tabs that don't reliably get it otherwise). 
+/**
+ * Every .05m (3s), make sure all windows have the tabs they need
+ * (handles stuff like detached tabs that don't reliably get it otherwise).
  */
 chrome.alarms.create("KOPT_MainLoop", {
 	periodInMinutes: .05,
@@ -136,7 +144,7 @@ chrome.alarms.onAlarm.addListener(async () =>
 
 
 /**
- * Core logic: check the given window to make sure it has our special pinned tab and 
+ * Core logic: check the given window to make sure it has our special pinned tab and
  * at least 1 additional tab.
  * @param {number} targetWindowId - ID of the window to check
  */
@@ -144,7 +152,7 @@ async function keepNeededTabs(targetWindowId)
 {
 	if (!targetWindowId)
 		return;
-	
+
 	const targetWindow = await getWindow(targetWindowId);
 	if (!targetWindow)
 		return
@@ -152,15 +160,15 @@ async function keepNeededTabs(targetWindowId)
 	// Safety check to make sure we're not creating infinite tabs
 	if (targetWindow.tabs.length > 50)
 		return;
-	
+
 	const pinnedURL = await getPinnedURL();
-	
+
 	// Safety checks
 	if (pinnedURL == "")
 		return;
 	if (targetWindow.type != "normal")
 		return;
-	
+
 	// Make sure our special pinned tab is the first one in the window.
 	if (!isSpecialPinnedTab(targetWindow.tabs[0], pinnedURL))
 	{
@@ -180,7 +188,7 @@ async function keepNeededTabs(targetWindowId)
 			// again shortly so we can just fail silently.
 			return;
 		}
-		
+
 		// Since new windows always have at least 1 tab to begin with, if we just added a pinned tab the
 		// window is guaranteed to have 2 (so we won't need to add an additional tab below).
 		return;
@@ -191,7 +199,7 @@ async function keepNeededTabs(targetWindowId)
 	// forcing those groups to uncollapse if we're unfocusing the pinned tab.
 	const visibleTabs = await getVisibleTabs(targetWindow);
 	if (visibleTabs.length < 2)
-	{ 
+	{
 		chrome.tabs.create({
 			"windowId": targetWindow.id,
 			"active":   true
@@ -213,11 +221,11 @@ function isSpecialPinnedTab(tab, urlToCheck)
 		return false;
 	if(!tab.pinned)
 		return false;
-	
+
 	// Make sure the tab has (or will have once it loads) our target URL.
 	if ((tab.url.indexOf(urlToCheck) === -1) && (tab.pendingUrl.indexOf(urlToCheck) === -1))
 		return false;
-	
+
 	return true;
 }
 
@@ -228,7 +236,7 @@ function isSpecialPinnedTab(tab, urlToCheck)
  * @returns Array of all "visible" tabs.
  */
 async function getVisibleTabs(window)
-{ 
+{
 	if (!window || (window == undefined))
 		return null;
 
@@ -237,7 +245,7 @@ async function getVisibleTabs(window)
 		if(await isTabVisible(tab))
 			visibleTabs.push(tab);
 	}
-	
+
 	return visibleTabs;
 }
 
@@ -247,7 +255,7 @@ async function getVisibleTabs(window)
  * @returns true/false - is the tab "visible"?
  */
 async function isTabVisible(tab)
-{ 
+{
 	if (!tab || (tab == undefined))
 		return false;
 
@@ -269,7 +277,7 @@ async function isTabVisible(tab)
  * 					.windowId - The tab's parent window ID
  */
 async function unfocusTab(tab)
-{ 
+{
 	if (!tab || (tab == undefined))
 		return;
 
@@ -284,7 +292,9 @@ async function unfocusTab(tab)
 	if (visibleTabs.length >= 2)
 	{
 		// We have at least 1 uncollapsed tab (beyond our special pinned one) to focus - use that.
-		tryFocusTab(visibleTabs[1].id, 20); // We're assuming index 0 is our special pinned tab.
+		// If lastTab is same as the next tab to switch, switch to the last tab in list
+		const nextTab = (visibleTabs[1].id == lastTabId ? visibleTabs[visibleTabs.length-1] : visibleTabs[1]).id
+		tryFocusTab(nextTab, 20); // We're assuming index 0 is our special pinned tab.
 	}
 	else
 	{
@@ -299,12 +309,12 @@ async function unfocusTab(tab)
  * @param {number} retriesToAllow How many times we can try (if we fail each time)
  * @param {number} retriesSoFar How many times we've retried so far (only called by this function)
  */
-async function tryFocusTab(tabId, retriesToAllow = 0, retriesSoFar = 0) { 
+async function tryFocusTab(tabId, retriesToAllow = 0, retriesSoFar = 0) {
 	// Make sure the tab still exists - if not, give up.
 	const tab = await chrome.tabs.get(tabId);
 	if (!tab || (tab === undefined))
 		return;
-	
+
 	// Try to focus the tab.
 	try
 	{
@@ -315,7 +325,7 @@ async function tryFocusTab(tabId, retriesToAllow = 0, retriesSoFar = 0) {
 		// Give up after about 2 seconds.
 		if (retriesSoFar > retriesToAllow)
 			return;
-	
+
 		// Sometimes this fails if the user doesn't let go of the button quick enough - try again.
 		setTimeout(() =>
 		{
@@ -335,7 +345,7 @@ async function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
 	const firstTab = targetWindow.tabs[0];
 	if(!isSpecialPinnedTab(firstTab, oldPinnedURL))
 		return;
-	
+
 	chrome.tabs.update(
 		firstTab.id,
 		{
@@ -347,7 +357,7 @@ async function convertWindow(targetWindow, oldPinnedURL, newPinnedURL) {
 
 // #region Chrome object getters
 /**
- * Convenience wrapper for getting a window that handles bad (generally just-closed) window IDs without 
+ * Convenience wrapper for getting a window that handles bad (generally just-closed) window IDs without
  * throwing extension-level errors. Callers are expected to handle the returned null value appropriately instead.
  * @param {number} windowId ID of the window to get
  * @returns Window object matching the given ID.
@@ -356,7 +366,7 @@ async function getWindow(windowId)
 {
 	if ((windowId == "") || (windowId == undefined))
 		return null;
-	
+
 	try
 	{
 		const window = await chrome.windows.get(
@@ -372,7 +382,7 @@ async function getWindow(windowId)
 		return window;
 	}
 	catch (error)
-	{ 
+	{
 		console.log("Failed to get window with ID: " + windowId.toString());
 		return null;
 	}
@@ -385,7 +395,7 @@ async function getWindow(windowId)
  * @returns TabGroup object matching the given ID.
  */
 async function getGroup(groupId)
-{ 
+{
 	if ((groupId == "") || (groupId == undefined))
 		return null;
 
@@ -398,11 +408,11 @@ async function getGroup(groupId)
 		return group;
 	}
 	catch (error)
-	{ 
+	{
 		console.log("Failed to get group with ID: " + groupId.toString());
 		return null;
 	}
-	
+
 }
 // #endregion Chrome object getters
 
@@ -430,13 +440,13 @@ async function getPinnedURL()
 	// Next, try generating it from the older version of our settings.
 	if (await convertFromLegacySettings())
 		return await getSingleSyncSetting(SettingKeys.PinnedURL); // Settings should have been updated by the conversion.
-	
+
 	// Finally, fall back to our default.
 	return "chrome://newtab/";
 }
 
 /**
- * Try to convert older versions of our settings (where page and custom URL were stored separately) 
+ * Try to convert older versions of our settings (where page and custom URL were stored separately)
  * to our new one (where the URL is a single setting).
  * @returns true if we successfully converted old settings to new ones, false otherwise.
  */
@@ -490,4 +500,3 @@ async function getSingleSyncSetting(settingKey)
 	return settings[settingKey];
 }
 // #endregion Settings getters
-
